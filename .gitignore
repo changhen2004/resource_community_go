@@ -37,3 +37,10 @@ Thumbs.db
 # ========== Debug ==========
 __debug_bin
 debug
+
+/docs
+
+//测试文件
+*_test.go
+*_test_test.go
+*_test_test_test.go

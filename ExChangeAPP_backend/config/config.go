@@ -1,9 +1,8 @@
 package config
 
 import (
-	"log"
+	"fmt"
 
-	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 )
 
@@ -22,23 +21,20 @@ type Config struct {
 	}
 }
 
-var AppConfig *Config
+func LoadConfig(configDir string) (*Config, error) {
+	v := viper.New()
+	v.SetConfigName("config")
+	v.SetConfigType("yaml")
+	v.AddConfigPath(configDir)
 
-func InitConfig() {
-	var ctx *gin.Context
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath("./config")
-
-	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Error reading config file, %v", err)
+	if err := v.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("read config: %w", err)
 	}
 
-	AppConfig = &Config{}
-	if err := viper.Unmarshal(&AppConfig); err != nil {
-		log.Fatalf("unable to decode into struct, %v", err)
+	cfg := &Config{}
+	if err := v.Unmarshal(cfg); err != nil {
+		return nil, fmt.Errorf("unmarshal config: %w", err)
 	}
 
-	InitDB()
-	InitRedis(ctx)
+	return cfg, nil
 }

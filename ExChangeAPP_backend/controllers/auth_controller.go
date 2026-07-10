@@ -17,7 +17,7 @@ func Register(ctx *gin.Context) {
 		return
 	}
 
-	hashedPwd, err := utils.HashPassword(user.Password) 
+	hashedPwd, err := utils.HashPassword(user.Password)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -30,15 +30,11 @@ func Register(ctx *gin.Context) {
 		return
 	}
 
-	if err := global.DB.AutoMigrate(&user); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
 	if err := global.DB.Create(&user).Error; err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	ctx.JSON(http.StatusOK, gin.H{"token": token})
 }
 

@@ -20,10 +20,6 @@ func CreateExchangeRate(ctx *gin.Context) {
 	}
 
 	exchangeRate.Date = time.Now()
-	if err := global.DB.AutoMigrate(&exchangeRate); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
 	if err := global.DB.Create(&exchangeRate).Error; err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -34,7 +30,7 @@ func CreateExchangeRate(ctx *gin.Context) {
 
 func GetExchangeRate(ctx *gin.Context) {
 	var exchangeRates []model.ExchangeRate
-	
+
 	if err := global.DB.Find(&exchangeRates).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": "Exchange rate not found"})

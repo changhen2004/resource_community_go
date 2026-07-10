@@ -1,26 +1,24 @@
 package config
 
 import (
-	"exchangeapp/global"
+	"context"
 	"log"
-	
-	"github.com/redis/go-redis/v9"
-	"github.com/gin-gonic/gin"
-)
-var RedisClient *redis.Client
 
-func InitRedis(ctx *gin.Context) {
-	RedisClient := redis.NewClient(&redis.Options{
-		Addr:     AppConfig.Redis.Addr,
-		Password: AppConfig.Redis.Password,
-		DB:       AppConfig.Redis.DB,
+	"github.com/redis/go-redis/v9"
+)
+
+func InitRedis(ctx context.Context, cfg *Config) (*redis.Client, error) {
+	client := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
 	})
 
-	
-	_, err := RedisClient.Ping(ctx).Result()
+	_, err := client.Ping(ctx).Result()
 	if err != nil {
-		log.Fatalf("Redis connection failed: %v", err)
+		return nil, err
 	}
 
-	global.RedisDB = RedisClient
+	log.Println("redis initialized")
+	return client, nil
 }
