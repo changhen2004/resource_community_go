@@ -1,12 +1,14 @@
 package controllers
 
 import (
+	"errors"
 	"exchangeapp/global"
 	"exchangeapp/model"
 	"exchangeapp/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func Register(ctx *gin.Context) {
@@ -14,6 +16,17 @@ func Register(ctx *gin.Context) {
 
 	if err := ctx.ShouldBindJSON(&user); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var existingUser model.User
+	err := global.DB.Where("username = ?", user.Username).First(&existingUser).Error
+	if err == nil {
+		ctx.JSON(http.StatusConflict, gin.H{"error": "username already exists"})
+		return
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
