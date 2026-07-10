@@ -1,0 +1,39 @@
+# ========== Go ==========
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+vendor/
+
+# ========== Node.js / Frontend ==========
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+
+# ========== IDE ==========
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ========== OS ==========
+.DS_Store
+Thumbs.db
+
+# ========== Build output ==========
+/bin/
+/build/
+
+# ========== Logs ==========
+*.log
+
+# ========== Debug ==========
+__debug_bin
+debug
