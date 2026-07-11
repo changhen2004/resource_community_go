@@ -5,15 +5,20 @@ import (
 	"strconv"
 
 	internalArticle "exchangeapp/internal/article"
+	"exchangeapp/internal/asyncjob"
 )
 
 type Service struct {
 	repo           *Repo
 	articleService *internalArticle.Service
+	publisher      asyncjob.Publisher
 }
 
-func NewService(repo *Repo, articleService *internalArticle.Service) *Service {
-	return &Service{repo: repo, articleService: articleService}
+func NewService(repo *Repo, articleService *internalArticle.Service, publisher asyncjob.Publisher) *Service {
+	if publisher == nil {
+		publisher = asyncjob.NoopPublisher{}
+	}
+	return &Service{repo: repo, articleService: articleService, publisher: publisher}
 }
 
 func (s *Service) Create(articleID string, userID uint) (FavoriteActionResponse, error) {
@@ -43,9 +48,16 @@ func (s *Service) Create(articleID string, userID uint) (FavoriteActionResponse,
 		return FavoriteActionResponse{}, err
 	}
 	s.repo.InvalidateArticleCaches(context.Background(), uint(parsedArticleID))
-	if s.articleService != nil {
-		if err := s.articleService.RecordFavoriteHeat(context.Background(), uint(parsedArticleID), true); err != nil {
-			return FavoriteActionResponse{}, err
+	if err := s.publisher.Publish(context.Background(), asyncjob.Job{
+		Type: asyncjob.TypeFavoriteCreated,
+		Payload: map[string]uint{
+			"articleID": uint(parsedArticleID),
+		},
+	}); err != nil {
+		if s.articleService != nil {
+			if err := s.articleService.RecordFavoriteHeat(context.Background(), uint(parsedArticleID), true); err != nil {
+				return FavoriteActionResponse{}, err
+			}
 		}
 	}
 
@@ -74,9 +86,16 @@ func (s *Service) Delete(articleID string, userID uint) (FavoriteActionResponse,
 		return FavoriteActionResponse{}, err
 	}
 	s.repo.InvalidateArticleCaches(context.Background(), uint(parsedArticleID))
-	if s.articleService != nil {
-		if err := s.articleService.RecordFavoriteHeat(context.Background(), uint(parsedArticleID), false); err != nil {
-			return FavoriteActionResponse{}, err
+	if err := s.publisher.Publish(context.Background(), asyncjob.Job{
+		Type: asyncjob.TypeFavoriteDeleted,
+		Payload: map[string]uint{
+			"articleID": uint(parsedArticleID),
+		},
+	}); err != nil {
+		if s.articleService != nil {
+			if err := s.articleService.RecordFavoriteHeat(context.Background(), uint(parsedArticleID), false); err != nil {
+				return FavoriteActionResponse{}, err
+			}
 		}
 	}
 

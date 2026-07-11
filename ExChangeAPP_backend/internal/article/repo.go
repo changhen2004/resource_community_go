@@ -149,6 +149,24 @@ func (r *Repo) IncrementLike(ctx context.Context, articleID string) (int, error)
 	return likes, nil
 }
 
+func (r *Repo) IncrementLikeRedisOnly(ctx context.Context, articleID string) (int, error) {
+	ctx = normalizeContext(ctx)
+
+	current, err := r.GetLikeCount(ctx, articleID)
+	if err != nil {
+		return 0, err
+	}
+
+	likes := current + 1
+	if r.redisDB != nil {
+		likeKey := "article:" + articleID + ":like"
+		if err := r.redisDB.Set(ctx, likeKey, likes, 0).Err(); err != nil {
+			return 0, err
+		}
+	}
+	return likes, nil
+}
+
 func (r *Repo) GetLikeCount(ctx context.Context, articleID string) (int, error) {
 	if r.redisDB != nil {
 		likeKey := "article:" + articleID + ":like"

@@ -23,6 +23,11 @@ type Config struct {
 		Password string
 		DB       int
 	}
+	RabbitMQ struct {
+		URL      string
+		Exchange string
+		Queue    string
+	}
 	Database struct {
 		DSN string
 	}
@@ -48,6 +53,9 @@ func LoadConfig(configDir string) (*Config, error) {
 	v.BindEnv("redis.addr", "EXCHANGEAPP_REDIS_ADDR")
 	v.BindEnv("redis.password", "EXCHANGEAPP_REDIS_PASSWORD")
 	v.BindEnv("redis.db", "EXCHANGEAPP_REDIS_DB")
+	v.BindEnv("rabbitmq.url", "EXCHANGEAPP_RABBITMQ_URL")
+	v.BindEnv("rabbitmq.exchange", "EXCHANGEAPP_RABBITMQ_EXCHANGE")
+	v.BindEnv("rabbitmq.queue", "EXCHANGEAPP_RABBITMQ_QUEUE")
 	v.BindEnv("storage.upload_dir", "EXCHANGEAPP_UPLOAD_DIR")
 
 	if err := v.ReadInConfig(); err != nil {
@@ -64,6 +72,15 @@ func LoadConfig(configDir string) (*Config, error) {
 	}
 	if cfg.Auth.JWTSecret == "" {
 		cfg.Auth.JWTSecret = "secret"
+	}
+	if cfg.RabbitMQ.URL == "" {
+		cfg.RabbitMQ.URL = "amqp://guest:guest@localhost:5672/"
+	}
+	if cfg.RabbitMQ.Exchange == "" {
+		cfg.RabbitMQ.Exchange = "exchangeapp.async"
+	}
+	if cfg.RabbitMQ.Queue == "" {
+		cfg.RabbitMQ.Queue = "exchangeapp.async.jobs"
 	}
 	if cfg.Storage.UploadDir == "" {
 		cfg.Storage.UploadDir = "uploads"

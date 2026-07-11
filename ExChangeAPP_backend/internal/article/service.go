@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"exchangeapp/internal/asyncjob"
 	"exchangeapp/internal/cachekey"
 	internalMedia "exchangeapp/internal/media"
 	internalPoints "exchangeapp/internal/points"
@@ -32,11 +33,15 @@ type articleDetailCachePayload struct {
 
 type Service struct {
 	repo          *Repo
+	publisher     asyncjob.Publisher
 	pointsService *internalPoints.Service
 }
 
-func NewService(repo *Repo, pointsService *internalPoints.Service) *Service {
-	return &Service{repo: repo, pointsService: pointsService}
+func NewService(repo *Repo, publisher asyncjob.Publisher, pointsService *internalPoints.Service) *Service {
+	if publisher == nil {
+		publisher = asyncjob.NoopPublisher{}
+	}
+	return &Service{repo: repo, publisher: publisher, pointsService: pointsService}
 }
 
 func (s *Service) Create(ctx context.Context, req CreateArticleRequest) (ArticleResponse, error) {
@@ -70,12 +75,20 @@ func (s *Service) Create(ctx context.Context, req CreateArticleRequest) (Article
 	if err := s.repo.Create(article); err != nil {
 		return ArticleResponse{}, err
 	}
-	if err := s.repo.SetInitialHotScore(ctx, article.ID, initialHotScore(article.CreatedAt)); err != nil {
-		return ArticleResponse{}, err
-	}
-	if s.pointsService != nil {
-		if err := s.pointsService.AwardPublishResource(article.AuthorID, article.ID); err != nil {
+	if err := s.publisher.Publish(ctx, asyncjob.Job{
+		Type: asyncjob.TypeArticlePublished,
+		Payload: map[string]uint{
+			"userID":    article.AuthorID,
+			"articleID": article.ID,
+		},
+	}); err != nil {
+		if err := s.SetInitialHeat(ctx, article.ID); err != nil {
 			return ArticleResponse{}, err
+		}
+		if s.pointsService != nil {
+			if err := s.pointsService.AwardPublishResource(article.AuthorID, article.ID); err != nil {
+				return ArticleResponse{}, err
+			}
 		}
 	}
 	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleListPrefix)
@@ -118,18 +131,27 @@ func (s *Service) FindByID(id string) (ArticleResponse, error) {
 func (s *Service) GetDetail(id string, currentUserID uint) (ArticleDetailResponse, error) {
 	ctx := context.Background()
 
-	article, err := s.repo.IncrementView(ctx, id)
+	article, err := s.repo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ArticleDetailResponse{}, ErrArticleNotFound
 		}
 		return ArticleDetailResponse{}, err
 	}
-	if err := s.repo.AddHotScore(ctx, article.ID, hotScoreView); err != nil {
-		return ArticleDetailResponse{}, err
+	if err := s.publisher.Publish(ctx, asyncjob.Job{
+		Type: asyncjob.TypeArticleViewed,
+		Payload: map[string]uint{
+			"articleID": article.ID,
+		},
+	}); err != nil {
+		if err := s.RecordView(ctx, article.ID); err != nil {
+			return ArticleDetailResponse{}, err
+		}
+		article, err = s.repo.FindByID(id)
+		if err != nil {
+			return ArticleDetailResponse{}, err
+		}
 	}
-	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleHotPrefix)
-	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleListPrefix)
 
 	cacheKey := cachekey.ArticleDetailKey(id)
 	cached, err := s.repo.GetArticlesCache(ctx, cacheKey)
@@ -176,14 +198,21 @@ func (s *Service) GetDetail(id string, currentUserID uint) (ArticleDetailRespons
 }
 
 func (s *Service) Like(ctx context.Context, articleID string) (LikeActionResponse, error) {
-	likes, err := s.repo.IncrementLike(ctx, articleID)
+	likes, err := s.repo.IncrementLikeRedisOnly(ctx, articleID)
 	if err != nil {
 		return LikeActionResponse{}, err
 	}
 	parsedArticleID, parseErr := strconv.ParseUint(articleID, 10, 64)
 	if parseErr == nil {
-		if err := s.repo.AddHotScore(ctx, uint(parsedArticleID), hotScoreLike); err != nil {
-			return LikeActionResponse{}, err
+		if err := s.publisher.Publish(ctx, asyncjob.Job{
+			Type: asyncjob.TypeArticleLiked,
+			Payload: map[string]uint{
+				"articleID": uint(parsedArticleID),
+			},
+		}); err != nil {
+			if err := s.ApplyLike(ctx, uint(parsedArticleID)); err != nil {
+				return LikeActionResponse{}, err
+			}
 		}
 	}
 	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleListPrefix)
@@ -247,6 +276,41 @@ func (s *Service) ListHot(ctx context.Context, limit int) ([]ArticleResponse, er
 		s.repo.SetArticlesCache(ctx, cacheKey, string(payload), cachekey.ArticleHotTTL)
 	}
 	return responses, nil
+}
+
+func (s *Service) SetInitialHeat(ctx context.Context, articleID uint) error {
+	article, err := s.repo.FindByID(strconv.FormatUint(uint64(articleID), 10))
+	if err != nil {
+		return err
+	}
+	return s.repo.SetInitialHotScore(ctx, article.ID, initialHotScore(article.CreatedAt))
+}
+
+func (s *Service) RecordView(ctx context.Context, articleID uint) error {
+	article, err := s.repo.IncrementView(ctx, strconv.FormatUint(uint64(articleID), 10))
+	if err != nil {
+		return err
+	}
+	if err := s.repo.AddHotScore(ctx, article.ID, hotScoreView); err != nil {
+		return err
+	}
+	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleHotPrefix)
+	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleListPrefix)
+	s.repo.DeleteArticleCacheKeys(ctx, cachekey.ArticleDetailKey(strconv.FormatUint(uint64(articleID), 10)))
+	return nil
+}
+
+func (s *Service) ApplyLike(ctx context.Context, articleID uint) error {
+	if _, err := s.repo.IncrementLike(ctx, strconv.FormatUint(uint64(articleID), 10)); err != nil {
+		return err
+	}
+	if err := s.repo.AddHotScore(ctx, articleID, hotScoreLike); err != nil {
+		return err
+	}
+	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleListPrefix)
+	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleHotPrefix)
+	s.repo.DeleteArticleCacheKeys(ctx, cachekey.ArticleDetailKey(strconv.FormatUint(uint64(articleID), 10)))
+	return nil
 }
 
 func (s *Service) RecordCommentHeat(ctx context.Context, articleID uint) error {

@@ -2,6 +2,7 @@ package app
 
 import (
 	internalArticle "exchangeapp/internal/article"
+	"exchangeapp/internal/asyncjob"
 	internalAuth "exchangeapp/internal/auth"
 	internalComment "exchangeapp/internal/comment"
 	internalExchange "exchangeapp/internal/exchange"
@@ -22,6 +23,7 @@ type Dependencies struct {
 	RedisDB              *redis.Client
 	UploadDir            string
 	EnablePprof          bool
+	AsyncPublisher       asyncjob.Publisher
 	SlowRequestThreshold time.Duration
 }
 
@@ -51,6 +53,7 @@ func SetUpRouter(deps Dependencies) *gin.Engine {
 	pointsHandler := internalPoints.NewHandler(pointsService)
 	articleService := internalArticle.NewService(
 		internalArticle.NewRepo(deps.DB, deps.RedisDB),
+		deps.AsyncPublisher,
 		pointsService,
 	)
 	articleHandler := internalArticle.NewHandler(
@@ -60,6 +63,7 @@ func SetUpRouter(deps Dependencies) *gin.Engine {
 		internalComment.NewService(
 			internalComment.NewRepo(deps.DB),
 			articleService,
+			deps.AsyncPublisher,
 			pointsService,
 		),
 	)
@@ -72,6 +76,7 @@ func SetUpRouter(deps Dependencies) *gin.Engine {
 		internalFavorite.NewService(
 			internalFavorite.NewRepo(deps.DB, deps.RedisDB),
 			articleService,
+			deps.AsyncPublisher,
 		),
 	)
 	mediaHandler := internalMedia.NewHandler(

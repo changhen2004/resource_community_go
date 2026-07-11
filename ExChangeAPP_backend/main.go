@@ -4,6 +4,7 @@ import (
 	"context"
 	"exchangeapp/config"
 	"exchangeapp/internal/app"
+	"exchangeapp/internal/asyncjob"
 	"exchangeapp/utils"
 	"log"
 	"time"
@@ -24,6 +25,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("init redis: %v", err)
 	}
+	rabbitConn, err := config.InitRabbitMQ(cfg)
+	if err != nil {
+		log.Fatalf("init rabbitmq: %v", err)
+	}
+	defer rabbitConn.Close()
+
+	publisher, err := asyncjob.NewRabbitPublisher(
+		rabbitConn,
+		cfg.RabbitMQ.Exchange,
+		cfg.RabbitMQ.Queue,
+	)
+	if err != nil {
+		log.Fatalf("init async publisher: %v", err)
+	}
+	defer publisher.Close()
 
 	if err := config.Migrate(db); err != nil {
 		log.Fatalf("migrate database: %v", err)
@@ -36,6 +52,7 @@ func main() {
 		RedisDB:              redisClient,
 		UploadDir:            cfg.Storage.UploadDir,
 		EnablePprof:          cfg.Observability.EnablePprof,
+		AsyncPublisher:       publisher,
 		SlowRequestThreshold: time.Duration(cfg.Observability.SlowRequestThresholdM) * time.Millisecond,
 	})
 

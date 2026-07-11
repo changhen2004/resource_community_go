@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	internalArticle "exchangeapp/internal/article"
+	"exchangeapp/internal/asyncjob"
 	internalPoints "exchangeapp/internal/points"
 	"gorm.io/gorm"
 )
@@ -13,11 +14,15 @@ import (
 type Service struct {
 	repo           *Repo
 	articleService *internalArticle.Service
+	publisher      asyncjob.Publisher
 	pointsService  *internalPoints.Service
 }
 
-func NewService(repo *Repo, articleService *internalArticle.Service, pointsService *internalPoints.Service) *Service {
-	return &Service{repo: repo, articleService: articleService, pointsService: pointsService}
+func NewService(repo *Repo, articleService *internalArticle.Service, publisher asyncjob.Publisher, pointsService *internalPoints.Service) *Service {
+	if publisher == nil {
+		publisher = asyncjob.NoopPublisher{}
+	}
+	return &Service{repo: repo, articleService: articleService, publisher: publisher, pointsService: pointsService}
 }
 
 func (s *Service) Create(ctx context.Context, articleID string, req CreateCommentRequest) (CommentResponse, error) {
@@ -42,14 +47,23 @@ func (s *Service) Create(ctx context.Context, articleID string, req CreateCommen
 	if err := s.repo.Create(comment); err != nil {
 		return CommentResponse{}, err
 	}
-	if s.pointsService != nil {
-		if err := s.pointsService.AwardQualityInteraction(comment.UserID, comment.ID); err != nil {
-			return CommentResponse{}, err
+	if err := s.publisher.Publish(ctx, asyncjob.Job{
+		Type: asyncjob.TypeCommentCreated,
+		Payload: map[string]uint{
+			"userID":    comment.UserID,
+			"articleID": comment.ArticleID,
+			"commentID": comment.ID,
+		},
+	}); err != nil {
+		if s.pointsService != nil {
+			if err := s.pointsService.AwardQualityInteraction(comment.UserID, comment.ID); err != nil {
+				return CommentResponse{}, err
+			}
 		}
-	}
-	if s.articleService != nil {
-		if err := s.articleService.RecordCommentHeat(ctx, comment.ArticleID); err != nil {
-			return CommentResponse{}, err
+		if s.articleService != nil {
+			if err := s.articleService.RecordCommentHeat(ctx, comment.ArticleID); err != nil {
+				return CommentResponse{}, err
+			}
 		}
 	}
 
@@ -103,9 +117,16 @@ func (s *Service) Delete(commentID string, userID uint) (DeleteCommentResponse, 
 	if err := s.repo.Delete(comment); err != nil {
 		return DeleteCommentResponse{}, err
 	}
-	if s.articleService != nil {
-		if err := s.articleService.RevertCommentHeat(context.Background(), comment.ArticleID); err != nil {
-			return DeleteCommentResponse{}, err
+	if err := s.publisher.Publish(context.Background(), asyncjob.Job{
+		Type: asyncjob.TypeCommentDeleted,
+		Payload: map[string]uint{
+			"articleID": comment.ArticleID,
+		},
+	}); err != nil {
+		if s.articleService != nil {
+			if err := s.articleService.RevertCommentHeat(context.Background(), comment.ArticleID); err != nil {
+				return DeleteCommentResponse{}, err
+			}
 		}
 	}
 

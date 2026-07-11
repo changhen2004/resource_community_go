@@ -32,6 +32,19 @@ services:
       timeout: 5s
       retries: 10
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: exchangeapp-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ./ExChangeAPP_backend
@@ -42,6 +55,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       EXCHANGEAPP_APP_PORT: ${EXCHANGEAPP_APP_PORT:-3000}
       EXCHANGEAPP_ENABLE_PPROF: ${EXCHANGEAPP_ENABLE_PPROF:-false}
@@ -50,6 +65,9 @@ services:
       EXCHANGEAPP_REDIS_ADDR: ${EXCHANGEAPP_REDIS_ADDR:-redis:6379}
       EXCHANGEAPP_REDIS_PASSWORD: ${EXCHANGEAPP_REDIS_PASSWORD:-}
       EXCHANGEAPP_REDIS_DB: ${EXCHANGEAPP_REDIS_DB:-0}
+      EXCHANGEAPP_RABBITMQ_URL: ${EXCHANGEAPP_RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      EXCHANGEAPP_RABBITMQ_EXCHANGE: ${EXCHANGEAPP_RABBITMQ_EXCHANGE:-exchangeapp.async}
+      EXCHANGEAPP_RABBITMQ_QUEUE: ${EXCHANGEAPP_RABBITMQ_QUEUE:-exchangeapp.async.jobs}
       EXCHANGEAPP_JWT_SECRET: ${EXCHANGEAPP_JWT_SECRET:-secret}
       EXCHANGEAPP_UPLOAD_DIR: ${EXCHANGEAPP_UPLOAD_DIR:-uploads}
     ports:
@@ -59,6 +77,34 @@ services:
       - backend_uploads:/app/uploads
     working_dir: /app
     command: ["go", "run", "."]
+
+  worker:
+    build:
+      context: ./ExChangeAPP_backend
+    container_name: exchangeapp-worker
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      EXCHANGEAPP_DATABASE_DSN: ${EXCHANGEAPP_DATABASE_DSN:-exchangeapp:exchangeapp@tcp(mysql:3306)/exchangeapp?charset=utf8mb4&parseTime=True&loc=Local}
+      EXCHANGEAPP_REDIS_ADDR: ${EXCHANGEAPP_REDIS_ADDR:-redis:6379}
+      EXCHANGEAPP_REDIS_PASSWORD: ${EXCHANGEAPP_REDIS_PASSWORD:-}
+      EXCHANGEAPP_REDIS_DB: ${EXCHANGEAPP_REDIS_DB:-0}
+      EXCHANGEAPP_RABBITMQ_URL: ${EXCHANGEAPP_RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      EXCHANGEAPP_RABBITMQ_EXCHANGE: ${EXCHANGEAPP_RABBITMQ_EXCHANGE:-exchangeapp.async}
+      EXCHANGEAPP_RABBITMQ_QUEUE: ${EXCHANGEAPP_RABBITMQ_QUEUE:-exchangeapp.async.jobs}
+      EXCHANGEAPP_JWT_SECRET: ${EXCHANGEAPP_JWT_SECRET:-secret}
+      EXCHANGEAPP_UPLOAD_DIR: ${EXCHANGEAPP_UPLOAD_DIR:-uploads}
+    volumes:
+      - ./ExChangeAPP_backend:/app
+      - backend_uploads:/app/uploads
+    working_dir: /app
+    command: ["go", "run", "./cmd/worker"]
 
   frontend:
     build:
