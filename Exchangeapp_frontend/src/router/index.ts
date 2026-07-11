@@ -1,18 +1,18 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
 import HomeView from '../views/HomeView.vue';
-import CurrencyExchangeView from '../views/CurrencyExchangeView.vue';
-import NewsView from '../views/NewsView.vue';
-import NewsDetailView from '../views/NewsDetailView.vue';
-import Login from '../components/Login.vue';
-import Register from '../components/Register.vue';
+import UserCenterView from '../views/UserCenterView.vue';
+import ResourceListView from '../views/ResourceListView.vue';
+import ResourceDetailView from '../views/ResourceDetailView.vue';
+import LoginView from '../views/auth/LoginView.vue';
+import RegisterView from '../views/auth/RegisterView.vue';
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'Home', component: HomeView },
-  { path: '/exchange', name: 'CurrencyExchange', component: CurrencyExchangeView },
-  { path: '/news', name: 'News', component: NewsView },
-  { path: '/news/:id', name: 'NewsDetail', component: NewsDetailView },
-  { path: '/login', name: 'Login', component: Login },
-  { path: '/register', name: 'Register', component: Register },
+  { path: '/center', name: 'Center', component: UserCenterView },
+  { path: '/resources', name: 'Resources', component: ResourceListView },
+  { path: '/resources/:id', name: 'ResourceDetail', component: ResourceDetailView },
+  { path: '/login', name: 'Login', component: LoginView },
+  { path: '/register', name: 'Register', component: RegisterView },
 ];
 
 const router = createRouter({
