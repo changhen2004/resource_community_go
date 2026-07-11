@@ -56,7 +56,12 @@ func (h *Handler) CreateArticle(ctx *gin.Context) {
 
 	resp, err := h.service.Create(ctx, req)
 	if err != nil {
-		writeError(ctx, http.StatusInternalServerError, 10005, err.Error(), "INTERNAL_ERROR")
+		switch {
+		case errors.Is(err, ErrTooManyContentImages):
+			writeError(ctx, http.StatusBadRequest, 10013, err.Error(), "TOO_MANY_FILES")
+		default:
+			writeError(ctx, http.StatusInternalServerError, 10005, err.Error(), "INTERNAL_ERROR")
+		}
 		return
 	}
 	writeSuccess(ctx, http.StatusCreated, resp)

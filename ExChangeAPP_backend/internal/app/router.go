@@ -6,6 +6,7 @@ import (
 	internalComment "exchangeapp/internal/comment"
 	internalExchange "exchangeapp/internal/exchange"
 	internalFavorite "exchangeapp/internal/favorite"
+	internalMedia "exchangeapp/internal/media"
 	internalPoints "exchangeapp/internal/points"
 	"time"
 
@@ -54,6 +55,9 @@ func SetUpRouter(deps Dependencies) *gin.Engine {
 			internalFavorite.NewRepo(deps.DB),
 		),
 	)
+	mediaHandler := internalMedia.NewHandler(
+		internalMedia.NewService(),
+	)
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},
@@ -63,6 +67,7 @@ func SetUpRouter(deps Dependencies) *gin.Engine {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
+	r.Static("/uploads", "./uploads")
 
 	auth := r.Group("/api/auth")
 	{
@@ -90,6 +95,8 @@ func SetUpRouter(deps Dependencies) *gin.Engine {
 		protectedAPI.DELETE("/comments/:id", commentHandler.DeleteComment)
 		protectedAPI.POST("/articles/:id/favorite", favoriteHandler.CreateFavorite)
 		protectedAPI.DELETE("/articles/:id/favorite", favoriteHandler.DeleteFavorite)
+		protectedAPI.POST("/uploads/cover", mediaHandler.UploadCover)
+		protectedAPI.POST("/uploads/content-images", mediaHandler.UploadContentImages)
 		protectedAPI.GET("/me/favorites", favoriteHandler.ListMyFavorites)
 		protectedAPI.GET("/me/points", pointsHandler.GetMyPoints)
 		protectedAPI.GET("/me/points/records", pointsHandler.GetMyPointsRecords)

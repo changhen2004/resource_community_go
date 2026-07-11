@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	internalMedia "exchangeapp/internal/media"
 	internalPoints "exchangeapp/internal/points"
 	"gorm.io/gorm"
 )
@@ -35,6 +36,8 @@ func (s *Service) Create(ctx context.Context, req CreateArticleRequest) (Article
 		Title:          req.Title,
 		Content:        req.Content,
 		Preview:        req.Preview,
+		CoverURL:       req.CoverURL,
+		ContentImages:  joinContentImages(req.ContentImages),
 		Tags:           joinTags(req.Tags),
 		Status:         req.Status,
 		IsFree:         isFree,
@@ -42,6 +45,9 @@ func (s *Service) Create(ctx context.Context, req CreateArticleRequest) (Article
 	}
 	if article.Status == "" {
 		article.Status = "draft"
+	}
+	if len(normalizeContentImages(req.ContentImages)) > internalMedia.ContentImageMaxCount {
+		return ArticleResponse{}, ErrTooManyContentImages
 	}
 
 	if err := s.repo.Create(article); err != nil {

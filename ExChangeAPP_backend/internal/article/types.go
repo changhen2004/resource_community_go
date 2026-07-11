@@ -9,6 +9,8 @@ type CreateArticleRequest struct {
 	Title          string   `json:"title" binding:"required,max=200"`
 	Content        string   `json:"content" binding:"required"`
 	Preview        string   `json:"preview" binding:"required,max=500"`
+	CoverURL       string   `json:"coverUrl"`
+	ContentImages  []string `json:"contentImages"`
 	Tags           []string `json:"tags"`
 	Status         string   `json:"status" binding:"omitempty,oneof=draft published archived"`
 	IsFree         *bool    `json:"isFree"`
@@ -29,6 +31,8 @@ type ArticleResponse struct {
 	Title          string    `json:"title"`
 	Content        string    `json:"content"`
 	Preview        string    `json:"preview"`
+	CoverURL       string    `json:"coverUrl"`
+	ContentImages  []string  `json:"contentImages"`
 	Tags           []string  `json:"tags"`
 	Status         string    `json:"status"`
 	ViewCount      uint      `json:"viewCount"`
@@ -56,6 +60,8 @@ type ArticleDetailResponse struct {
 	Title          string                `json:"title"`
 	Content        string                `json:"content"`
 	Preview        string                `json:"preview"`
+	CoverURL       string                `json:"coverUrl"`
+	ContentImages  []string              `json:"contentImages"`
 	Tags           []string              `json:"tags"`
 	Status         string                `json:"status"`
 	Author         ArticleAuthorResponse `json:"author"`
@@ -83,6 +89,8 @@ func toArticleResponse(article Article) ArticleResponse {
 		Title:          article.Title,
 		Content:        article.Content,
 		Preview:        article.Preview,
+		CoverURL:       article.CoverURL,
+		ContentImages:  splitContentImages(article.ContentImages),
 		Tags:           splitTags(article.Tags),
 		Status:         article.Status,
 		ViewCount:      article.ViewCount,
@@ -161,15 +169,44 @@ func splitTags(tags string) []string {
 	return strings.Split(tags, ",")
 }
 
+func joinContentImages(urls []string) string {
+	return strings.Join(normalizeContentImages(urls), ",")
+}
+
+func splitContentImages(urls string) []string {
+	if strings.TrimSpace(urls) == "" {
+		return []string{}
+	}
+	return strings.Split(urls, ",")
+}
+
+func normalizeContentImages(urls []string) []string {
+	if len(urls) == 0 {
+		return nil
+	}
+
+	normalized := make([]string, 0, len(urls))
+	for _, url := range urls {
+		cleaned := strings.TrimSpace(url)
+		if cleaned == "" {
+			continue
+		}
+		normalized = append(normalized, cleaned)
+	}
+	return normalized
+}
+
 func toArticleDetailResponse(article Article, author ArticleAuthorResponse, isUnlocked bool) ArticleDetailResponse {
 	return ArticleDetailResponse{
-		ID:      article.ID,
-		Title:   article.Title,
-		Content: article.Content,
-		Preview: article.Preview,
-		Tags:    splitTags(article.Tags),
-		Status:  article.Status,
-		Author:  author,
+		ID:            article.ID,
+		Title:         article.Title,
+		Content:       article.Content,
+		Preview:       article.Preview,
+		CoverURL:      article.CoverURL,
+		ContentImages: splitContentImages(article.ContentImages),
+		Tags:          splitTags(article.Tags),
+		Status:        article.Status,
+		Author:        author,
 		Stats: ArticleStatsResponse{
 			ViewCount:     article.ViewCount,
 			LikeCount:     article.LikeCount,
