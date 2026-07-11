@@ -86,3 +86,35 @@ func (h *Handler) Login(ctx *gin.Context) {
 
 	writeSuccess(ctx, http.StatusOK, resp)
 }
+
+func (h *Handler) Refresh(ctx *gin.Context) {
+	var req RefreshTokenRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeError(ctx, http.StatusBadRequest, 10001, err.Error(), "INVALID_REQUEST")
+		return
+	}
+
+	resp, err := h.service.Refresh(req)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrInvalidRefreshToken):
+			writeError(ctx, http.StatusUnauthorized, 10002, err.Error(), "INVALID_REFRESH_TOKEN")
+		case errors.Is(err, ErrUserNotFound):
+			writeError(ctx, http.StatusUnauthorized, 10002, err.Error(), "USER_NOT_FOUND")
+		default:
+			writeError(ctx, http.StatusInternalServerError, 10005, err.Error(), "INTERNAL_ERROR")
+		}
+		return
+	}
+
+	writeSuccess(ctx, http.StatusOK, resp)
+}
+
+func (h *Handler) Logout(ctx *gin.Context) {
+	if err := h.service.Logout(ctx.GetUint("userID")); err != nil {
+		writeError(ctx, http.StatusInternalServerError, 10005, err.Error(), "INTERNAL_ERROR")
+		return
+	}
+
+	writeSuccess(ctx, http.StatusOK, gin.H{})
+}

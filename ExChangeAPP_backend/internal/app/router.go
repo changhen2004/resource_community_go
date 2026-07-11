@@ -24,10 +24,11 @@ type Dependencies struct {
 func SetUpRouter(deps Dependencies) *gin.Engine {
 	r := gin.Default()
 
+	authService := internalAuth.NewService(
+		internalAuth.NewRepo(deps.DB, deps.RedisDB),
+	)
 	authHandler := internalAuth.NewHandler(
-		internalAuth.NewService(
-			internalAuth.NewRepo(deps.DB),
-		),
+		authService,
 	)
 	pointsService := internalPoints.NewService(
 		internalPoints.NewRepo(deps.DB, deps.RedisDB),
@@ -73,6 +74,7 @@ func SetUpRouter(deps Dependencies) *gin.Engine {
 	{
 		auth.POST("/login", authHandler.Login)
 		auth.POST("/register", authHandler.Register)
+		auth.POST("/refresh", authHandler.Refresh)
 	}
 
 	publicAPI := r.Group("/api")
@@ -86,8 +88,9 @@ func SetUpRouter(deps Dependencies) *gin.Engine {
 	}
 
 	protectedAPI := r.Group("/api")
-	protectedAPI.Use(AuthMiddleware())
+	protectedAPI.Use(AuthMiddleware(authService))
 	{
+		protectedAPI.POST("/auth/logout", authHandler.Logout)
 		protectedAPI.POST("/exchangeRates", exchangeHandler.CreateExchangeRate)
 		protectedAPI.POST("/articles", articleHandler.CreateArticle)
 		protectedAPI.POST("/articles/:id/like", articleHandler.LikeArticle)

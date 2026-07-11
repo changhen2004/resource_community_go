@@ -150,7 +150,7 @@ func currentUserIDFromRequest(ctx *gin.Context) uint {
 		return 0
 	}
 
-	claims, err := utils.ParseJWT(strings.TrimSpace(parts[1]))
+	claims, err := utils.ParseAccessToken(strings.TrimSpace(parts[1]))
 	if err != nil {
 		return 0
 	}

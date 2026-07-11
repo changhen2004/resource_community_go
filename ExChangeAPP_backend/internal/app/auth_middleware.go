@@ -1,7 +1,7 @@
 package app
 
 import (
-	"exchangeapp/utils"
+	internalAuth "exchangeapp/internal/auth"
 	"net/http"
 	"strings"
 
@@ -28,7 +28,7 @@ func writeError(ctx *gin.Context, status int, code int, message, errorCode strin
 	})
 }
 
-func AuthMiddleware() gin.HandlerFunc {
+func AuthMiddleware(authService *internalAuth.Service) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		authHeader := ctx.GetHeader("Authorization")
 		if authHeader == "" {
@@ -44,7 +44,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		claims, err := utils.ParseJWT(strings.TrimSpace(parts[1]))
+		claims, err := authService.ValidateAccessToken(strings.TrimSpace(parts[1]))
 		if err != nil {
 			writeError(ctx, http.StatusUnauthorized, 10002, err.Error(), "UNAUTHORIZED")
 			ctx.Abort()

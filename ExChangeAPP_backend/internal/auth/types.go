@@ -10,6 +10,11 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required,min=6,max=72"`
 }
 
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
 type AuthResponse struct {
-	Token string `json:"token"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
