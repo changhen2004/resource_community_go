@@ -20,9 +20,9 @@ dist/
 .env.*.local
 
 # Vue/TS source-generated artifacts; keep .ts/.vue only in src/
-src/**/*.js
-src/**/*.vue.js
-__VLS_types.d.ts
+./src/**/*.js
+./src/**/*.vue.js
+./src/__VLS_types.d.ts
 
 
 # ========== IDE ==========
