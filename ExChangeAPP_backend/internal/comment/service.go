@@ -103,6 +103,11 @@ func (s *Service) Delete(commentID string, userID uint) (DeleteCommentResponse, 
 	if err := s.repo.Delete(comment); err != nil {
 		return DeleteCommentResponse{}, err
 	}
+	if s.articleService != nil {
+		if err := s.articleService.RevertCommentHeat(context.Background(), comment.ArticleID); err != nil {
+			return DeleteCommentResponse{}, err
+		}
+	}
 
 	return DeleteCommentResponse{Message: "comment deleted successfully"}, nil
 }

@@ -90,6 +90,80 @@
               />
             </div>
           </div>
+
+          <section class="comment-panel">
+            <div class="panel-head">
+              <div>
+                <p class="panel-kicker">Comments</p>
+                <h2>评论区</h2>
+              </div>
+              <el-button text :loading="commentLoading" @click="fetchComments">刷新</el-button>
+            </div>
+
+            <div v-if="authStore.isAuthenticated" class="comment-editor">
+              <el-input
+                v-model="commentForm"
+                type="textarea"
+                :rows="4"
+                maxlength="1000"
+                show-word-limit
+                placeholder="写下你的评论，分享你对这个资源的看法。"
+              />
+              <div class="comment-editor__actions">
+                <span class="comment-editor__hint">登录用户可以参与讨论并推动内容热度上升。</span>
+                <el-button
+                  type="primary"
+                  :loading="commentSubmitting"
+                  :disabled="!commentForm.trim()"
+                  @click="handleCreateComment"
+                >
+                  发布评论
+                </el-button>
+              </div>
+            </div>
+            <el-alert
+              v-else
+              type="info"
+              :closable="false"
+              show-icon
+              title="登录后可以发表评论并参与互动"
+            />
+
+            <div v-if="commentLoading" class="comment-loading">
+              <el-skeleton :rows="3" animated />
+            </div>
+            <el-result
+              v-else-if="commentErrorMessage"
+              icon="warning"
+              title="评论加载失败"
+              :sub-title="commentErrorMessage"
+            >
+              <template #extra>
+                <el-button @click="fetchComments">重试</el-button>
+              </template>
+            </el-result>
+            <el-empty v-else-if="!comments.length" description="还没有评论，来发表第一条观点" />
+            <div v-else class="comment-list">
+              <article v-for="comment in comments" :key="comment.id" class="comment-item">
+                <div class="comment-item__head">
+                  <div>
+                    <strong>{{ comment.author.username }}</strong>
+                    <span class="comment-item__time">{{ formatDate(comment.createdAt) }}</span>
+                  </div>
+                  <el-button
+                    v-if="canDeleteComment(comment.userId)"
+                    text
+                    type="danger"
+                    :loading="deletingCommentId === comment.id"
+                    @click="handleDeleteComment(comment.id)"
+                  >
+                    删除
+                  </el-button>
+                </div>
+                <p class="comment-item__content">{{ comment.content }}</p>
+              </article>
+            </div>
+          </section>
         </article>
 
         <aside class="detail-sidebar">
@@ -136,6 +210,10 @@
                 <strong>{{ resource.stats?.viewCount ?? resource.viewCount ?? 0 }}</strong>
               </div>
               <div class="stat-item">
+                <span>评论</span>
+                <strong>{{ resource.stats?.commentCount ?? resource.commentCount ?? 0 }}</strong>
+              </div>
+              <div class="stat-item">
                 <span>收藏</span>
                 <strong>{{ resource.stats?.favoriteCount ?? resource.favoriteCount ?? 0 }}</strong>
               </div>
@@ -165,6 +243,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { getArticleDetail, getArticleLikes, likeArticle } from '../api/article';
+import { createComment, deleteComment, listComments, type Comment } from '../api/comment';
 import { unlockArticle } from '../api/points';
 import { useAuthStore } from '../store/auth';
 import type { ResourceDetail } from '../types/resource';
@@ -178,6 +257,12 @@ const likes = ref<number>(0);
 const loading = ref(false);
 const unlocking = ref(false);
 const errorMessage = ref('');
+const comments = ref<Comment[]>([]);
+const commentForm = ref('');
+const commentLoading = ref(false);
+const commentSubmitting = ref(false);
+const deletingCommentId = ref<number | null>(null);
+const commentErrorMessage = ref('');
 
 const resourceID = String(route.params.id);
 
@@ -237,17 +322,73 @@ const fetchLikes = async () => {
   likes.value = response.likes;
 };
 
+const fetchComments = async () => {
+  commentLoading.value = true;
+  commentErrorMessage.value = '';
+
+  try {
+    comments.value = await listComments(resourceID);
+  } catch (error) {
+    console.error('Failed to load comments:', error);
+    commentErrorMessage.value = '评论列表加载失败，请稍后重试。';
+  } finally {
+    commentLoading.value = false;
+  }
+};
+
 const fetchPageData = async () => {
   loading.value = true;
   errorMessage.value = '';
 
   try {
-    await Promise.all([fetchResource(), fetchLikes()]);
+    await Promise.all([fetchResource(), fetchLikes(), fetchComments()]);
   } catch (error) {
     console.error('Failed to load resource detail:', error);
     errorMessage.value = '详情内容加载失败，请稍后重试。';
   } finally {
     loading.value = false;
+  }
+};
+
+const handleCreateComment = async () => {
+  if (!authStore.isAuthenticated) {
+    ElMessage.error('请先登录后再评论');
+    return;
+  }
+
+  const content = commentForm.value.trim();
+  if (!content) {
+    ElMessage.error('评论内容不能为空');
+    return;
+  }
+
+  commentSubmitting.value = true;
+  try {
+    await createComment(resourceID, { content });
+    commentForm.value = '';
+    await Promise.all([fetchComments(), fetchResource()]);
+    ElMessage.success('评论发布成功');
+  } catch (error) {
+    console.error('Failed to create comment:', error);
+    ElMessage.error('评论发布失败，请稍后再试。');
+  } finally {
+    commentSubmitting.value = false;
+  }
+};
+
+const canDeleteComment = (userId: number) => authStore.currentUser?.userID === userId;
+
+const handleDeleteComment = async (commentId: number) => {
+  deletingCommentId.value = commentId;
+  try {
+    await deleteComment(commentId);
+    await Promise.all([fetchComments(), fetchResource()]);
+    ElMessage.success('评论已删除');
+  } catch (error) {
+    console.error('Failed to delete comment:', error);
+    ElMessage.error('删除评论失败，请稍后再试。');
+  } finally {
+    deletingCommentId.value = null;
   }
 };
 
@@ -289,6 +430,15 @@ const redirectToLogin = () => {
   router.push({ name: 'Login' });
 };
 
+const formatDate = (value: string) =>
+  new Date(value).toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
 onMounted(fetchPageData);
 </script>
 
@@ -317,7 +467,8 @@ onMounted(fetchPageData);
 .panel,
 .detail-cover,
 .author-strip,
-.content-body {
+.content-body,
+.comment-panel {
   border: 1px solid rgba(89, 48, 29, 0.09);
   border-radius: 26px;
   background: rgba(255, 251, 247, 0.84);
@@ -463,6 +614,92 @@ onMounted(fetchPageData);
   padding: 24px;
 }
 
+.comment-panel {
+  padding: 24px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.panel-kicker {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #9f7358;
+}
+
+.panel-head h2 {
+  margin: 0;
+  color: #2e1a12;
+}
+
+.comment-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.comment-editor__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.comment-editor__hint {
+  font-size: 13px;
+  color: #8c6e5b;
+}
+
+.comment-loading {
+  padding: 8px 0;
+}
+
+.comment-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.comment-item {
+  border: 1px solid rgba(111, 76, 56, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.68);
+  padding: 16px 18px;
+}
+
+.comment-item__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.comment-item__head strong {
+  display: block;
+  color: #4b2818;
+}
+
+.comment-item__time {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #8f6d58;
+}
+
+.comment-item__content {
+  margin: 0;
+  line-height: 1.8;
+  color: #5e3b29;
+  white-space: pre-wrap;
+}
+
 .body-copy {
   margin: 0;
   color: #503b31;
@@ -604,6 +841,11 @@ onMounted(fetchPageData);
 
   .panel--sticky {
     position: static;
+  }
+
+  .comment-editor__actions {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

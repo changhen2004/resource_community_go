@@ -23,7 +23,16 @@ func (r *Repo) ArticleExists(articleID uint) (bool, error) {
 }
 
 func (r *Repo) Create(comment *Comment) error {
-	return r.db.Create(comment).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(comment).Error; err != nil {
+			return err
+		}
+
+		return tx.Table("articles").
+			Where("id = ?", comment.ArticleID).
+			UpdateColumn("comment_count", gorm.Expr("comment_count + ?", 1)).
+			Error
+	})
 }
 
 func (r *Repo) FindByID(commentID uint) (*Comment, error) {
@@ -35,7 +44,16 @@ func (r *Repo) FindByID(commentID uint) (*Comment, error) {
 }
 
 func (r *Repo) Delete(comment *Comment) error {
-	return r.db.Delete(comment).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(comment).Error; err != nil {
+			return err
+		}
+
+		return tx.Table("articles").
+			Where("id = ?", comment.ArticleID).
+			UpdateColumn("comment_count", gorm.Expr("CASE WHEN comment_count > 0 THEN comment_count - 1 ELSE 0 END")).
+			Error
+	})
 }
 
 func (r *Repo) FindAuthorByID(userID uint) (CommentAuthorResponse, error) {

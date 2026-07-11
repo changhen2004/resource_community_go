@@ -14,6 +14,7 @@ type Article struct {
 	Status         string `binding:"omitempty,oneof=draft published archived" gorm:"size:20;not null;default:draft;index"`
 	ViewCount      uint   `gorm:"not null;default:0"`
 	LikeCount      uint   `gorm:"not null;default:0"`
+	CommentCount   uint   `gorm:"not null;default:0"`
 	FavoriteCount  uint   `gorm:"not null;default:0"`
 	IsFree         bool   `gorm:"not null;index"`
 	RequiredPoints uint   `gorm:"not null;default:0"`

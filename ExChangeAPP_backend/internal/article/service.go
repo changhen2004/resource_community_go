@@ -137,6 +137,7 @@ func (s *Service) GetDetail(id string, currentUserID uint) (ArticleDetailRespons
 		var payload articleDetailCachePayload
 		if unmarshalErr := json.Unmarshal([]byte(cached), &payload); unmarshalErr == nil {
 			payload.Stats.ViewCount = article.ViewCount
+			payload.Stats.CommentCount = article.CommentCount
 			isUnlocked, unlockErr := s.resolveUnlockStatus(Article{
 				Model:          gorm.Model{ID: article.ID},
 				AuthorID:       payload.Author.ID,
@@ -250,6 +251,16 @@ func (s *Service) ListHot(ctx context.Context, limit int) ([]ArticleResponse, er
 
 func (s *Service) RecordCommentHeat(ctx context.Context, articleID uint) error {
 	if err := s.repo.AddHotScore(ctx, articleID, hotScoreComment); err != nil {
+		return err
+	}
+	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleHotPrefix)
+	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleListPrefix)
+	s.repo.DeleteArticleCacheKeys(ctx, cachekey.ArticleDetailKey(strconv.FormatUint(uint64(articleID), 10)))
+	return nil
+}
+
+func (s *Service) RevertCommentHeat(ctx context.Context, articleID uint) error {
+	if err := s.repo.AddHotScore(ctx, articleID, -hotScoreComment); err != nil {
 		return err
 	}
 	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleHotPrefix)

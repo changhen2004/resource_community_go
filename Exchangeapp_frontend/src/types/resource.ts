@@ -10,6 +10,7 @@ export interface ResourceSummary {
   status?: string;
   viewCount?: number;
   likeCount?: number;
+  commentCount?: number;
   favoriteCount?: number;
   isFree?: boolean;
   requiredPoints?: number;
@@ -23,6 +24,7 @@ export interface ResourceDetail extends ResourceSummary {
   stats?: {
     viewCount: number;
     likeCount: number;
+    commentCount: number;
     favoriteCount: number;
   };
   isUnlocked?: boolean;

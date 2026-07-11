@@ -142,6 +142,7 @@
             <div class="resource-stats">
               <span>热度 {{ resource.likeCount ?? 0 }}</span>
               <span>浏览 {{ resource.viewCount ?? 0 }}</span>
+              <span>评论 {{ resource.commentCount ?? 0 }}</span>
             </div>
             <el-button text type="primary" @click="viewDetail(resource.id)">阅读更多</el-button>
           </div>

@@ -37,6 +37,7 @@ type ArticleResponse struct {
 	Status         string    `json:"status"`
 	ViewCount      uint      `json:"viewCount"`
 	LikeCount      uint      `json:"likeCount"`
+	CommentCount   uint      `json:"commentCount"`
 	FavoriteCount  uint      `json:"favoriteCount"`
 	IsFree         bool      `json:"isFree"`
 	RequiredPoints uint      `json:"requiredPoints"`
@@ -52,6 +53,7 @@ type ArticleAuthorResponse struct {
 type ArticleStatsResponse struct {
 	ViewCount     uint `json:"viewCount"`
 	LikeCount     uint `json:"likeCount"`
+	CommentCount  uint `json:"commentCount"`
 	FavoriteCount uint `json:"favoriteCount"`
 }
 
@@ -95,6 +97,7 @@ func toArticleResponse(article Article) ArticleResponse {
 		Status:         article.Status,
 		ViewCount:      article.ViewCount,
 		LikeCount:      article.LikeCount,
+		CommentCount:   article.CommentCount,
 		FavoriteCount:  article.FavoriteCount,
 		IsFree:         article.IsFree,
 		RequiredPoints: article.RequiredPoints,
@@ -210,6 +213,7 @@ func toArticleDetailResponse(article Article, author ArticleAuthorResponse, isUn
 		Stats: ArticleStatsResponse{
 			ViewCount:     article.ViewCount,
 			LikeCount:     article.LikeCount,
+			CommentCount:  article.CommentCount,
 			FavoriteCount: article.FavoriteCount,
 		},
 		IsFree:         article.IsFree,

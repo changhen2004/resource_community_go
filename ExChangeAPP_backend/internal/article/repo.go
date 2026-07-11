@@ -284,6 +284,7 @@ func (r *Repo) SeedHotRanking(ctx context.Context, limit int) error {
 		score := initialHotScore(article.CreatedAt) +
 			float64(article.ViewCount)*hotScoreView +
 			float64(article.LikeCount)*hotScoreLike +
+			float64(article.CommentCount)*hotScoreComment +
 			float64(article.FavoriteCount)*hotScoreFavorite
 		members = append(members, redis.Z{
 			Score:  score,
