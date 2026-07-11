@@ -3,8 +3,10 @@ package article
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type Handler struct {
@@ -59,14 +61,20 @@ func (h *Handler) CreateArticle(ctx *gin.Context) {
 }
 
 func (h *Handler) GetArticles(ctx *gin.Context) {
-	resp, err := h.service.List(ctx)
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("pageSize", "10"))
+
+	query := NewListArticlesQuery(
+		page,
+		pageSize,
+		ctx.Query("sort"),
+		ctx.Query("keyword"),
+		ctx.Query("tag"),
+	)
+
+	resp, err := h.service.List(ctx, query)
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrArticleNotFound):
-			writeError(ctx, http.StatusNotFound, 10003, "No articles found", "ARTICLE_NOT_FOUND")
-		default:
-			writeError(ctx, http.StatusInternalServerError, 10005, err.Error(), "INTERNAL_ERROR")
-		}
+		writeError(ctx, http.StatusInternalServerError, 10005, err.Error(), "INTERNAL_ERROR")
 		return
 	}
 	writeSuccess(ctx, http.StatusOK, resp)
@@ -76,7 +84,7 @@ func (h *Handler) GetArticleByID(ctx *gin.Context) {
 	resp, err := h.service.FindByID(ctx.Param("id"))
 	if err != nil {
 		switch {
-		case errors.Is(err, ErrArticleNotFound):
+		case errors.Is(err, ErrArticleNotFound), errors.Is(err, gorm.ErrRecordNotFound):
 			writeError(ctx, http.StatusNotFound, 10003, "Article not found", "ARTICLE_NOT_FOUND")
 		default:
 			writeError(ctx, http.StatusInternalServerError, 10005, err.Error(), "INTERNAL_ERROR")
@@ -90,8 +98,8 @@ func (h *Handler) LikeArticle(ctx *gin.Context) {
 	resp, err := h.service.Like(ctx, ctx.Param("id"))
 	if err != nil {
 		switch {
-		case errors.Is(err, ErrRedisUnavailable):
-			writeError(ctx, http.StatusInternalServerError, 10006, err.Error(), "REDIS_UNAVAILABLE")
+		case errors.Is(err, ErrArticleNotFound), errors.Is(err, gorm.ErrRecordNotFound):
+			writeError(ctx, http.StatusNotFound, 10003, "Article not found", "ARTICLE_NOT_FOUND")
 		default:
 			writeError(ctx, http.StatusInternalServerError, 10005, err.Error(), "INTERNAL_ERROR")
 		}
@@ -103,7 +111,12 @@ func (h *Handler) LikeArticle(ctx *gin.Context) {
 func (h *Handler) GetArticleLikes(ctx *gin.Context) {
 	resp, err := h.service.GetLikes(ctx, ctx.Param("id"))
 	if err != nil {
-		writeError(ctx, http.StatusInternalServerError, 10006, err.Error(), "REDIS_UNAVAILABLE")
+		switch {
+		case errors.Is(err, ErrArticleNotFound), errors.Is(err, gorm.ErrRecordNotFound):
+			writeError(ctx, http.StatusNotFound, 10003, "Article not found", "ARTICLE_NOT_FOUND")
+		default:
+			writeError(ctx, http.StatusInternalServerError, 10005, err.Error(), "INTERNAL_ERROR")
+		}
 		return
 	}
 	writeSuccess(ctx, http.StatusOK, resp)

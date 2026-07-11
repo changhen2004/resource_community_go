@@ -3,13 +3,10 @@ package article
 import (
 	"context"
 	"encoding/json"
-	"errors"
-
-	"github.com/redis/go-redis/v9"
-	"gorm.io/gorm"
+	"fmt"
 )
 
-const CacheKey = "articles"
+const CacheKeyPrefix = "articles:list:"
 
 type Service struct {
 	repo *Repo
@@ -24,6 +21,7 @@ func (s *Service) Create(ctx context.Context, req CreateArticleRequest) (Article
 		Title:   req.Title,
 		Content: req.Content,
 		Preview: req.Preview,
+		Tags:    joinTags(req.Tags),
 		Status:  req.Status,
 	}
 	if article.Status == "" {
@@ -33,13 +31,14 @@ func (s *Service) Create(ctx context.Context, req CreateArticleRequest) (Article
 	if err := s.repo.Create(article); err != nil {
 		return ArticleResponse{}, err
 	}
-	s.repo.DeleteArticlesCache(ctx, CacheKey)
+	s.repo.DeleteArticlesCacheByPrefix(ctx, CacheKeyPrefix)
 
 	return toArticleResponse(*article), nil
 }
 
-func (s *Service) List(ctx context.Context) ([]ArticleResponse, error) {
-	cached, err := s.repo.GetArticlesCache(ctx, CacheKey)
+func (s *Service) List(ctx context.Context, query ListArticlesQuery) ([]ArticleResponse, error) {
+	cacheKey := buildListCacheKey(query)
+	cached, err := s.repo.GetArticlesCache(ctx, cacheKey)
 	if err == nil {
 		var responses []ArticleResponse
 		if unmarshalErr := json.Unmarshal([]byte(cached), &responses); unmarshalErr == nil {
@@ -47,17 +46,14 @@ func (s *Service) List(ctx context.Context) ([]ArticleResponse, error) {
 		}
 	}
 
-	articles, err := s.repo.List()
+	articles, err := s.repo.List(query)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrArticleNotFound
-		}
 		return nil, err
 	}
 
 	responses := toArticleResponses(articles)
 	if payload, marshalErr := json.Marshal(responses); marshalErr == nil {
-		s.repo.SetArticlesCache(ctx, CacheKey, string(payload))
+		s.repo.SetArticlesCache(ctx, cacheKey, string(payload))
 	}
 	return responses, nil
 }
@@ -65,9 +61,6 @@ func (s *Service) List(ctx context.Context) ([]ArticleResponse, error) {
 func (s *Service) FindByID(id string) (ArticleResponse, error) {
 	article, err := s.repo.FindByID(id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ArticleResponse{}, ErrArticleNotFound
-		}
 		return ArticleResponse{}, err
 	}
 
@@ -77,9 +70,6 @@ func (s *Service) FindByID(id string) (ArticleResponse, error) {
 func (s *Service) Like(ctx context.Context, articleID string) (LikeActionResponse, error) {
 	likes, err := s.repo.IncrementLike(ctx, articleID)
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return LikeActionResponse{}, ErrRedisUnavailable
-		}
 		return LikeActionResponse{}, err
 	}
 
@@ -92,10 +82,19 @@ func (s *Service) Like(ctx context.Context, articleID string) (LikeActionRespons
 func (s *Service) GetLikes(ctx context.Context, articleID string) (LikeResponse, error) {
 	likes, err := s.repo.GetLikeCount(ctx, articleID)
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return LikeResponse{Likes: 0}, nil
-		}
 		return LikeResponse{}, err
 	}
 	return LikeResponse{Likes: likes}, nil
+}
+
+func buildListCacheKey(query ListArticlesQuery) string {
+	return fmt.Sprintf(
+		"%spage=%d:size=%d:sort=%s:keyword=%s:tag=%s",
+		CacheKeyPrefix,
+		query.Page,
+		query.PageSize,
+		query.Sort,
+		query.Keyword,
+		query.Tag,
+	)
 }
