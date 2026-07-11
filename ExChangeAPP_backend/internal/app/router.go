@@ -4,7 +4,6 @@ import (
 	internalArticle "exchangeapp/internal/article"
 	internalAuth "exchangeapp/internal/auth"
 	internalExchange "exchangeapp/internal/exchange"
-	"exchangeapp/middlewares"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -61,7 +60,7 @@ func SetUpRouter(deps Dependencies) *gin.Engine {
 	}
 
 	protectedAPI := r.Group("/api")
-	protectedAPI.Use(middlewares.AuthMiddleware())
+	protectedAPI.Use(AuthMiddleware())
 	{
 		protectedAPI.POST("/exchangeRates", exchangeHandler.CreateExchangeRate)
 		protectedAPI.POST("/articles", articleHandler.CreateArticle)

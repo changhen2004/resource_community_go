@@ -1,4 +1,4 @@
-package middlewares
+package app
 
 import (
 	"exchangeapp/utils"
