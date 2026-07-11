@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"time"
 
 	"exchangeapp/internal/cachekey"
@@ -69,6 +70,9 @@ func (s *Service) Create(ctx context.Context, req CreateArticleRequest) (Article
 	if err := s.repo.Create(article); err != nil {
 		return ArticleResponse{}, err
 	}
+	if err := s.repo.SetInitialHotScore(ctx, article.ID, initialHotScore(article.CreatedAt)); err != nil {
+		return ArticleResponse{}, err
+	}
 	if s.pointsService != nil {
 		if err := s.pointsService.AwardPublishResource(article.AuthorID, article.ID); err != nil {
 			return ArticleResponse{}, err
@@ -112,13 +116,29 @@ func (s *Service) FindByID(id string) (ArticleResponse, error) {
 }
 
 func (s *Service) GetDetail(id string, currentUserID uint) (ArticleDetailResponse, error) {
+	ctx := context.Background()
+
+	article, err := s.repo.IncrementView(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ArticleDetailResponse{}, ErrArticleNotFound
+		}
+		return ArticleDetailResponse{}, err
+	}
+	if err := s.repo.AddHotScore(ctx, article.ID, hotScoreView); err != nil {
+		return ArticleDetailResponse{}, err
+	}
+	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleHotPrefix)
+	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleListPrefix)
+
 	cacheKey := cachekey.ArticleDetailKey(id)
-	cached, err := s.repo.GetArticlesCache(context.Background(), cacheKey)
+	cached, err := s.repo.GetArticlesCache(ctx, cacheKey)
 	if err == nil {
 		var payload articleDetailCachePayload
 		if unmarshalErr := json.Unmarshal([]byte(cached), &payload); unmarshalErr == nil {
+			payload.Stats.ViewCount = article.ViewCount
 			isUnlocked, unlockErr := s.resolveUnlockStatus(Article{
-				Model:          gorm.Model{ID: payload.ID},
+				Model:          gorm.Model{ID: article.ID},
 				AuthorID:       payload.Author.ID,
 				IsFree:         payload.IsFree,
 				RequiredPoints: payload.RequiredPoints,
@@ -126,16 +146,11 @@ func (s *Service) GetDetail(id string, currentUserID uint) (ArticleDetailRespons
 			if unlockErr != nil {
 				return ArticleDetailResponse{}, unlockErr
 			}
+			if refreshedPayload, marshalErr := json.Marshal(payload); marshalErr == nil {
+				s.repo.SetArticlesCache(ctx, cacheKey, string(refreshedPayload), cachekey.ArticleDetailTTL)
+			}
 			return payload.toResponse(isUnlocked), nil
 		}
-	}
-
-	article, err := s.repo.FindByID(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ArticleDetailResponse{}, ErrArticleNotFound
-		}
-		return ArticleDetailResponse{}, err
 	}
 
 	author, err := s.repo.FindAuthorByID(article.AuthorID)
@@ -154,7 +169,7 @@ func (s *Service) GetDetail(id string, currentUserID uint) (ArticleDetailRespons
 
 	response := toArticleDetailResponse(*article, author, isUnlocked)
 	if payload, marshalErr := json.Marshal(newArticleDetailCachePayload(response)); marshalErr == nil {
-		s.repo.SetArticlesCache(context.Background(), cacheKey, string(payload), cachekey.ArticleDetailTTL)
+		s.repo.SetArticlesCache(ctx, cacheKey, string(payload), cachekey.ArticleDetailTTL)
 	}
 	return response, nil
 }
@@ -163,6 +178,12 @@ func (s *Service) Like(ctx context.Context, articleID string) (LikeActionRespons
 	likes, err := s.repo.IncrementLike(ctx, articleID)
 	if err != nil {
 		return LikeActionResponse{}, err
+	}
+	parsedArticleID, parseErr := strconv.ParseUint(articleID, 10, 64)
+	if parseErr == nil {
+		if err := s.repo.AddHotScore(ctx, uint(parsedArticleID), hotScoreLike); err != nil {
+			return LikeActionResponse{}, err
+		}
 	}
 	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleListPrefix)
 	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleHotPrefix)
@@ -199,15 +220,57 @@ func (s *Service) ListHot(ctx context.Context, limit int) ([]ArticleResponse, er
 		}
 	}
 
-	articles, err := s.repo.List(NewListArticlesQuery(1, limit, "hot", "", ""))
+	if err := s.repo.SeedHotRanking(ctx, 200); err != nil {
+		return nil, err
+	}
+
+	hotIDs, err := s.repo.GetHotArticleIDs(ctx, int64(limit))
 	if err != nil {
 		return nil, err
+	}
+
+	var articles []Article
+	if len(hotIDs) > 0 {
+		articles, err = s.repo.ListByIDs(hotIDs)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		articles, err = s.repo.List(NewListArticlesQuery(1, limit, "hot", "", ""))
+		if err != nil {
+			return nil, err
+		}
 	}
 	responses := toArticleResponses(articles)
 	if payload, marshalErr := json.Marshal(responses); marshalErr == nil {
 		s.repo.SetArticlesCache(ctx, cacheKey, string(payload), cachekey.ArticleHotTTL)
 	}
 	return responses, nil
+}
+
+func (s *Service) RecordCommentHeat(ctx context.Context, articleID uint) error {
+	if err := s.repo.AddHotScore(ctx, articleID, hotScoreComment); err != nil {
+		return err
+	}
+	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleHotPrefix)
+	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleListPrefix)
+	s.repo.DeleteArticleCacheKeys(ctx, cachekey.ArticleDetailKey(strconv.FormatUint(uint64(articleID), 10)))
+	return nil
+}
+
+func (s *Service) RecordFavoriteHeat(ctx context.Context, articleID uint, increase bool) error {
+	delta := float64(-hotScoreFavorite)
+	if increase {
+		delta = hotScoreFavorite
+	}
+
+	if err := s.repo.AddHotScore(ctx, articleID, delta); err != nil {
+		return err
+	}
+	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleHotPrefix)
+	s.repo.DeleteArticlesCacheByPrefix(ctx, cachekey.ArticleListPrefix)
+	s.repo.DeleteArticleCacheKeys(ctx, cachekey.ArticleDetailKey(strconv.FormatUint(uint64(articleID), 10)))
+	return nil
 }
 
 func (s *Service) resolveUnlockStatus(article Article, currentUserID uint) (bool, error) {

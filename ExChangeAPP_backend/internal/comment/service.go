@@ -5,17 +5,19 @@ import (
 	"errors"
 	"strconv"
 
+	internalArticle "exchangeapp/internal/article"
 	internalPoints "exchangeapp/internal/points"
 	"gorm.io/gorm"
 )
 
 type Service struct {
-	repo          *Repo
-	pointsService *internalPoints.Service
+	repo           *Repo
+	articleService *internalArticle.Service
+	pointsService  *internalPoints.Service
 }
 
-func NewService(repo *Repo, pointsService *internalPoints.Service) *Service {
-	return &Service{repo: repo, pointsService: pointsService}
+func NewService(repo *Repo, articleService *internalArticle.Service, pointsService *internalPoints.Service) *Service {
+	return &Service{repo: repo, articleService: articleService, pointsService: pointsService}
 }
 
 func (s *Service) Create(ctx context.Context, articleID string, req CreateCommentRequest) (CommentResponse, error) {
@@ -42,6 +44,11 @@ func (s *Service) Create(ctx context.Context, articleID string, req CreateCommen
 	}
 	if s.pointsService != nil {
 		if err := s.pointsService.AwardQualityInteraction(comment.UserID, comment.ID); err != nil {
+			return CommentResponse{}, err
+		}
+	}
+	if s.articleService != nil {
+		if err := s.articleService.RecordCommentHeat(ctx, comment.ArticleID); err != nil {
 			return CommentResponse{}, err
 		}
 	}

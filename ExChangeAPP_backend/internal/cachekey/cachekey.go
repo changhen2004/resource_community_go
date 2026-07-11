@@ -12,6 +12,7 @@ const (
 	ArticleListPrefix   = "articles:list:"
 	ArticleDetailPrefix = "articles:detail:"
 	ArticleHotPrefix    = "articles:hot:"
+	ArticleHotZSetKey   = "articles:hot:zset"
 	PointsSummaryPrefix = "points:summary:"
 )
 
@@ -50,6 +51,9 @@ func DeleteByPrefix(ctx context.Context, redisDB *redis.Client, prefix string) {
 	if redisDB == nil {
 		return
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	iter := redisDB.Scan(ctx, 0, prefix+"*", 0).Iterator()
 	keys := make([]string, 0)
@@ -64,6 +68,9 @@ func DeleteByPrefix(ctx context.Context, redisDB *redis.Client, prefix string) {
 func DeleteKeys(ctx context.Context, redisDB *redis.Client, keys ...string) {
 	if redisDB == nil || len(keys) == 0 {
 		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	_ = redisDB.Del(ctx, keys...).Err()
 }

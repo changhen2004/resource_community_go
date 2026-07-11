@@ -2,6 +2,7 @@ package article
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +24,13 @@ type articleAuthor struct {
 
 func NewRepo(db *gorm.DB, redisDB *redis.Client) *Repo {
 	return &Repo{db: db, redisDB: redisDB}
+}
+
+func normalizeContext(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
 }
 
 func (r *Repo) Create(article *Article) error {
@@ -101,6 +109,7 @@ func (r *Repo) GetArticlesCache(ctx context.Context, key string) (string, error)
 	if r.redisDB == nil {
 		return "", redis.Nil
 	}
+	ctx = normalizeContext(ctx)
 	return r.redisDB.Get(ctx, key).Result()
 }
 
@@ -108,10 +117,12 @@ func (r *Repo) SetArticlesCache(ctx context.Context, key, value string, ttl time
 	if r.redisDB == nil {
 		return
 	}
+	ctx = normalizeContext(ctx)
 	_ = r.redisDB.Set(ctx, key, value, ttl).Err()
 }
 
 func (r *Repo) DeleteArticleCacheKeys(ctx context.Context, keys ...string) {
+	ctx = normalizeContext(ctx)
 	cachekey.DeleteKeys(ctx, r.redisDB, keys...)
 }
 
@@ -155,6 +166,136 @@ func (r *Repo) GetLikeCount(ctx context.Context, articleID string) (int, error) 
 		return 0, err
 	}
 	return int(article.LikeCount), nil
+}
+
+func (r *Repo) IncrementView(ctx context.Context, articleID string) (*Article, error) {
+	if err := r.db.Model(&Article{}).
+		Where("id = ?", articleID).
+		UpdateColumn("view_count", gorm.Expr("view_count + ?", 1)).
+		Error; err != nil {
+		return nil, err
+	}
+
+	return r.FindByID(articleID)
+}
+
+func (r *Repo) AddHotScore(ctx context.Context, articleID uint, delta float64) error {
+	if r.redisDB == nil || articleID == 0 || delta == 0 {
+		return nil
+	}
+
+	ctx = normalizeContext(ctx)
+	return r.redisDB.ZIncrBy(ctx, cachekey.ArticleHotZSetKey, delta, strconv.FormatUint(uint64(articleID), 10)).Err()
+}
+
+func (r *Repo) SetInitialHotScore(ctx context.Context, articleID uint, score float64) error {
+	if r.redisDB == nil || articleID == 0 {
+		return nil
+	}
+
+	ctx = normalizeContext(ctx)
+	return r.redisDB.ZAdd(ctx, cachekey.ArticleHotZSetKey, redis.Z{
+		Score:  score,
+		Member: strconv.FormatUint(uint64(articleID), 10),
+	}).Err()
+}
+
+func (r *Repo) GetHotArticleIDs(ctx context.Context, limit int64) ([]uint, error) {
+	if r.redisDB == nil || limit <= 0 {
+		return nil, nil
+	}
+
+	ctx = normalizeContext(ctx)
+	members, err := r.redisDB.ZRevRange(ctx, cachekey.ArticleHotZSetKey, 0, limit-1).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]uint, 0, len(members))
+	for _, member := range members {
+		parsed, parseErr := strconv.ParseUint(member, 10, 64)
+		if parseErr != nil {
+			continue
+		}
+		ids = append(ids, uint(parsed))
+	}
+
+	return ids, nil
+}
+
+func (r *Repo) ListByIDs(ids []uint) ([]Article, error) {
+	if len(ids) == 0 {
+		return []Article{}, nil
+	}
+
+	var articles []Article
+	if err := r.db.Where("id IN ?", ids).Find(&articles).Error; err != nil {
+		return nil, err
+	}
+
+	ordered := make(map[uint]Article, len(articles))
+	for _, article := range articles {
+		ordered[article.ID] = article
+	}
+
+	result := make([]Article, 0, len(ids))
+	for _, id := range ids {
+		article, ok := ordered[id]
+		if !ok {
+			continue
+		}
+		result = append(result, article)
+	}
+
+	return result, nil
+}
+
+func (r *Repo) SeedHotRanking(ctx context.Context, limit int) error {
+	if r.redisDB == nil {
+		return nil
+	}
+
+	ctx = normalizeContext(ctx)
+	var count int64
+	count, err := r.redisDB.ZCard(ctx, cachekey.ArticleHotZSetKey).Result()
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	if limit < 1 {
+		limit = 100
+	}
+
+	var articles []Article
+	if err := r.db.Order("like_count DESC").
+		Order("favorite_count DESC").
+		Order("view_count DESC").
+		Order("created_at DESC").
+		Limit(limit).
+		Find(&articles).Error; err != nil {
+		return err
+	}
+
+	members := make([]redis.Z, 0, len(articles))
+	for _, article := range articles {
+		score := initialHotScore(article.CreatedAt) +
+			float64(article.ViewCount)*hotScoreView +
+			float64(article.LikeCount)*hotScoreLike +
+			float64(article.FavoriteCount)*hotScoreFavorite
+		members = append(members, redis.Z{
+			Score:  score,
+			Member: fmt.Sprintf("%d", article.ID),
+		})
+	}
+
+	if len(members) == 0 {
+		return nil
+	}
+
+	return r.redisDB.ZAdd(ctx, cachekey.ArticleHotZSetKey, members...).Err()
 }
 
 func (r *Repo) applyTagFilter(db *gorm.DB, tag string) *gorm.DB {

@@ -3,14 +3,17 @@ package favorite
 import (
 	"context"
 	"strconv"
+
+	internalArticle "exchangeapp/internal/article"
 )
 
 type Service struct {
-	repo *Repo
+	repo           *Repo
+	articleService *internalArticle.Service
 }
 
-func NewService(repo *Repo) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repo, articleService *internalArticle.Service) *Service {
+	return &Service{repo: repo, articleService: articleService}
 }
 
 func (s *Service) Create(articleID string, userID uint) (FavoriteActionResponse, error) {
@@ -40,6 +43,11 @@ func (s *Service) Create(articleID string, userID uint) (FavoriteActionResponse,
 		return FavoriteActionResponse{}, err
 	}
 	s.repo.InvalidateArticleCaches(context.Background(), uint(parsedArticleID))
+	if s.articleService != nil {
+		if err := s.articleService.RecordFavoriteHeat(context.Background(), uint(parsedArticleID), true); err != nil {
+			return FavoriteActionResponse{}, err
+		}
+	}
 
 	return FavoriteActionResponse{
 		Message:       "article favorited successfully",
@@ -66,6 +74,11 @@ func (s *Service) Delete(articleID string, userID uint) (FavoriteActionResponse,
 		return FavoriteActionResponse{}, err
 	}
 	s.repo.InvalidateArticleCaches(context.Background(), uint(parsedArticleID))
+	if s.articleService != nil {
+		if err := s.articleService.RecordFavoriteHeat(context.Background(), uint(parsedArticleID), false); err != nil {
+			return FavoriteActionResponse{}, err
+		}
+	}
 
 	return FavoriteActionResponse{
 		Message:       "article unfavorited successfully",
