@@ -8,7 +8,7 @@
           <el-button text @click="viewDetail(article.ID)">阅读更多</el-button>
         </el-card>
       </div>
-      <div v-else class="no-data">您必须登录/注册才可以查看文章</div>
+      <div v-else class="no-data">暂无文章内容</div>
     </el-main>
   </el-container>
 </template>
@@ -16,14 +16,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
 import axios from '../axios';
-import { useAuthStore } from '../store/auth';
 import type { Article } from "../types/Article";
 
 const articles = ref<Article[]>([]);
 const router = useRouter();
-const authStore = useAuthStore();
 
 const fetchArticles = async () => {
   try {
@@ -35,10 +32,6 @@ const fetchArticles = async () => {
 };
 
 const viewDetail = (id: string) => {
-  if (!authStore.isAuthenticated) {
-    ElMessage.error('请先登录后再查看');
-    return;
-  }
   router.push({ name: 'NewsDetail', params: { id } });
 };
 

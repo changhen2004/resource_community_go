@@ -27,18 +27,21 @@ func SetUpRouter() *gin.Engine {
 		auth.POST("/login", controllers.Login)
 		auth.POST("/register", controllers.Register)
 	}
-	api := r.Group("/api")
 
-	api.GET("/exchangeRates", controllers.GetExchangeRate)
-	api.Use(middlewares.AuthMiddleware())
+	publicAPI := r.Group("/api")
 	{
-		api.POST("/exchangeRates", controllers.CreateExchangeRate)
-		api.POST("/articles", controllers.CreateArticle)
-		api.GET("/articles", controllers.GetArticles)
-		api.GET("/articles/:id", controllers.GetArticleByID)
+		publicAPI.GET("/exchangeRates", controllers.GetExchangeRate)
+		publicAPI.GET("/articles", controllers.GetArticles)
+		publicAPI.GET("/articles/:id", controllers.GetArticleByID)
+		publicAPI.GET("/articles/:id/like", controllers.GetArticleLikes)
+	}
 
-		api.GET("/articles/:id/like", controllers.GetArticleLikes)
-		api.POST("/articles/:id/like", controllers.LikeArticle)
+	protectedAPI := r.Group("/api")
+	protectedAPI.Use(middlewares.AuthMiddleware())
+	{
+		protectedAPI.POST("/exchangeRates", controllers.CreateExchangeRate)
+		protectedAPI.POST("/articles", controllers.CreateArticle)
+		protectedAPI.POST("/articles/:id/like", controllers.LikeArticle)
 	}
 	return r
 }

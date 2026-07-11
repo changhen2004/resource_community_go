@@ -9,19 +9,22 @@
           <p>点赞数: {{ likes }}</p>
         </div>
       </el-card>
-      <div v-else class="no-data">您必须登录/注册才可以阅读文章</div>
+      <div v-else class="no-data">暂无文章内容</div>
     </el-main>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUpdated, onBeforeUpdate, onBeforeMount } from "vue";
+import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
+import { ElMessage } from "element-plus";
 import axios from "../axios";
+import { useAuthStore } from '../store/auth';
 import type { Article, Like } from "../types/Article";
 
 const article = ref<Article | null>(null);
 const route = useRoute();
+const authStore = useAuthStore();
 const likes = ref<number>(0)
 
 const { id } = route.params;
@@ -36,6 +39,10 @@ const fetchArticle = async () => {
 };
 
 const likeArticle = async () => {
+  if (!authStore.isAuthenticated) {
+    ElMessage.error('请先登录后再点赞');
+    return;
+  }
   try {
     const res = await axios.post<Like>(`articles/${id}/like`)
     likes.value = res.data.likes
