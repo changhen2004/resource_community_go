@@ -2,6 +2,10 @@ app:
   name: "ExchangeApp"
   port: 3000
 
+observability:
+  enable_pprof: false
+  slow_request_threshold_ms: 500
+
 auth:
   jwt_secret: "secret"
 

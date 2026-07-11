@@ -11,24 +11,33 @@ import (
 	"time"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
 type Dependencies struct {
-	DB        *gorm.DB
-	RedisDB   *redis.Client
-	UploadDir string
+	DB                   *gorm.DB
+	RedisDB              *redis.Client
+	UploadDir            string
+	EnablePprof          bool
+	SlowRequestThreshold time.Duration
 }
 
 func SetUpRouter(deps Dependencies) *gin.Engine {
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(ObservabilityMiddleware(deps.SlowRequestThreshold))
 	r.GET("/healthz", func(ctx *gin.Context) {
 		ctx.JSON(200, gin.H{
 			"status": "ok",
 		})
 	})
+
+	if deps.EnablePprof {
+		pprof.Register(r)
+	}
 
 	authService := internalAuth.NewService(
 		internalAuth.NewRepo(deps.DB, deps.RedisDB),

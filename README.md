@@ -15,6 +15,7 @@ cp .env.example .env
 - 本地开发：使用本机 `localhost` 地址
 - 测试环境：替换数据库、Redis、JWT 密钥
 - 生产环境：替换数据库、Redis、JWT 密钥、上传目录、前端 API 地址
+- 可观测性：可通过环境变量控制 `pprof` 和慢请求阈值
 
 ## 开发环境启动
 

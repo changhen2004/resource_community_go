@@ -11,6 +11,10 @@ type Config struct {
 		Name string
 		Port string
 	}
+	Observability struct {
+		EnablePprof           bool
+		SlowRequestThresholdM int
+	}
 	Auth struct {
 		JWTSecret string
 	}
@@ -34,7 +38,11 @@ func LoadConfig(configDir string) (*Config, error) {
 	v.AddConfigPath(configDir)
 	v.SetEnvPrefix("EXCHANGEAPP")
 	v.AutomaticEnv()
+	v.SetDefault("observability.enable_pprof", false)
+	v.SetDefault("observability.slow_request_threshold_ms", 500)
 	v.BindEnv("app.port", "EXCHANGEAPP_APP_PORT")
+	v.BindEnv("observability.enable_pprof", "EXCHANGEAPP_ENABLE_PPROF")
+	v.BindEnv("observability.slow_request_threshold_ms", "EXCHANGEAPP_SLOW_REQUEST_THRESHOLD_MS")
 	v.BindEnv("auth.jwt_secret", "EXCHANGEAPP_JWT_SECRET")
 	v.BindEnv("database.dsn", "EXCHANGEAPP_DATABASE_DSN")
 	v.BindEnv("redis.addr", "EXCHANGEAPP_REDIS_ADDR")

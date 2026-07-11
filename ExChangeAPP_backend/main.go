@@ -6,6 +6,7 @@ import (
 	"exchangeapp/internal/app"
 	"exchangeapp/utils"
 	"log"
+	"time"
 )
 
 func main() {
@@ -31,9 +32,11 @@ func main() {
 	utils.SetJWTSecret(cfg.Auth.JWTSecret)
 
 	r := app.SetUpRouter(app.Dependencies{
-		DB:        db,
-		RedisDB:   redisClient,
-		UploadDir: cfg.Storage.UploadDir,
+		DB:                   db,
+		RedisDB:              redisClient,
+		UploadDir:            cfg.Storage.UploadDir,
+		EnablePprof:          cfg.Observability.EnablePprof,
+		SlowRequestThreshold: time.Duration(cfg.Observability.SlowRequestThresholdM) * time.Millisecond,
 	})
 
 	port := cfg.App.Port
