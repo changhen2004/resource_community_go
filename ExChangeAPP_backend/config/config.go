@@ -26,6 +26,13 @@ func LoadConfig(configDir string) (*Config, error) {
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
 	v.AddConfigPath(configDir)
+	v.SetEnvPrefix("EXCHANGEAPP")
+	v.AutomaticEnv()
+	v.BindEnv("app.port", "EXCHANGEAPP_APP_PORT")
+	v.BindEnv("database.dsn", "EXCHANGEAPP_DATABASE_DSN")
+	v.BindEnv("redis.addr", "EXCHANGEAPP_REDIS_ADDR")
+	v.BindEnv("redis.password", "EXCHANGEAPP_REDIS_PASSWORD")
+	v.BindEnv("redis.db", "EXCHANGEAPP_REDIS_DB")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)

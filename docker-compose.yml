@@ -1,0 +1,79 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: exchangeapp-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: exchangeapp
+      MYSQL_USER: exchangeapp
+      MYSQL_PASSWORD: exchangeapp
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: exchangeapp-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./ExChangeAPP_backend
+    container_name: exchangeapp-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      EXCHANGEAPP_APP_PORT: "3000"
+      EXCHANGEAPP_DATABASE_DSN: "exchangeapp:exchangeapp@tcp(mysql:3306)/exchangeapp?charset=utf8mb4&parseTime=True&loc=Local"
+      EXCHANGEAPP_REDIS_ADDR: "redis:6379"
+      EXCHANGEAPP_REDIS_PASSWORD: ""
+      EXCHANGEAPP_REDIS_DB: "0"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ExChangeAPP_backend:/app
+      - backend_uploads:/app/uploads
+    working_dir: /app
+    command: ["go", "run", "."]
+
+  frontend:
+    build:
+      context: ./Exchangeapp_frontend
+    container_name: exchangeapp-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_BASE_URL: "http://localhost:3000/api"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./Exchangeapp_frontend:/app
+      - /app/node_modules
+    working_dir: /app
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+
+volumes:
+  mysql_data:
+  redis_data:
+  backend_uploads:

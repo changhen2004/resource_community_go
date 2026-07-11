@@ -1,0 +1,10 @@
+.git
+.gitignore
+tmp
+bin
+build
+vendor
+coverage.out
+*.log
+*_test.go
+
