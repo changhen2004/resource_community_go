@@ -4,6 +4,7 @@ import (
 	"context"
 	"exchangeapp/config"
 	"exchangeapp/internal/app"
+	"exchangeapp/utils"
 	"log"
 )
 
@@ -27,9 +28,12 @@ func main() {
 		log.Fatalf("migrate database: %v", err)
 	}
 
+	utils.SetJWTSecret(cfg.Auth.JWTSecret)
+
 	r := app.SetUpRouter(app.Dependencies{
-		DB:      db,
-		RedisDB: redisClient,
+		DB:        db,
+		RedisDB:   redisClient,
+		UploadDir: cfg.Storage.UploadDir,
 	})
 
 	port := cfg.App.Port

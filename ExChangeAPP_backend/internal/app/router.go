@@ -17,8 +17,9 @@ import (
 )
 
 type Dependencies struct {
-	DB      *gorm.DB
-	RedisDB *redis.Client
+	DB        *gorm.DB
+	RedisDB   *redis.Client
+	UploadDir string
 }
 
 func SetUpRouter(deps Dependencies) *gin.Engine {
@@ -57,7 +58,7 @@ func SetUpRouter(deps Dependencies) *gin.Engine {
 		),
 	)
 	mediaHandler := internalMedia.NewHandler(
-		internalMedia.NewService(),
+		internalMedia.NewService(deps.UploadDir),
 	)
 
 	r.Use(cors.New(cors.Config{
@@ -68,7 +69,7 @@ func SetUpRouter(deps Dependencies) *gin.Engine {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
-	r.Static("/uploads", "./uploads")
+	r.Static("/uploads", deps.UploadDir)
 
 	auth := r.Group("/api/auth")
 	{

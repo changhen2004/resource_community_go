@@ -8,16 +8,16 @@
 *.out
 go.work
 vendor/
+coverage.out
+.coverprofile
 *_test.go
-*_test_test.go
-*_test_test_test.go
 
 # ========== Node.js / Frontend ==========
 node_modules/
 dist/
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Vue/TS source-generated artifacts; keep .ts/.vue only in src/
 Exchangeapp_frontend/src/**/*.js
@@ -37,8 +37,9 @@ Exchangeapp_frontend/__VLS_types.d.ts
 Thumbs.db
 
 # ========== Build output ==========
-/bin/
-/build/
+bin/
+build/
+uploads/
 
 # ========== Logs ==========
 *.log

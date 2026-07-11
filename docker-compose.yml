@@ -4,16 +4,16 @@ services:
     container_name: exchangeapp-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: exchangeapp
-      MYSQL_USER: exchangeapp
-      MYSQL_PASSWORD: exchangeapp
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-exchangeapp}
+      MYSQL_USER: ${MYSQL_USER:-exchangeapp}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-exchangeapp}
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-proot"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${MYSQL_ROOT_PASSWORD:-root}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -43,11 +43,13 @@ services:
       redis:
         condition: service_healthy
     environment:
-      EXCHANGEAPP_APP_PORT: "3000"
-      EXCHANGEAPP_DATABASE_DSN: "exchangeapp:exchangeapp@tcp(mysql:3306)/exchangeapp?charset=utf8mb4&parseTime=True&loc=Local"
-      EXCHANGEAPP_REDIS_ADDR: "redis:6379"
-      EXCHANGEAPP_REDIS_PASSWORD: ""
-      EXCHANGEAPP_REDIS_DB: "0"
+      EXCHANGEAPP_APP_PORT: ${EXCHANGEAPP_APP_PORT:-3000}
+      EXCHANGEAPP_DATABASE_DSN: ${EXCHANGEAPP_DATABASE_DSN:-exchangeapp:exchangeapp@tcp(mysql:3306)/exchangeapp?charset=utf8mb4&parseTime=True&loc=Local}
+      EXCHANGEAPP_REDIS_ADDR: ${EXCHANGEAPP_REDIS_ADDR:-redis:6379}
+      EXCHANGEAPP_REDIS_PASSWORD: ${EXCHANGEAPP_REDIS_PASSWORD:-}
+      EXCHANGEAPP_REDIS_DB: ${EXCHANGEAPP_REDIS_DB:-0}
+      EXCHANGEAPP_JWT_SECRET: ${EXCHANGEAPP_JWT_SECRET:-secret}
+      EXCHANGEAPP_UPLOAD_DIR: ${EXCHANGEAPP_UPLOAD_DIR:-uploads}
     ports:
       - "3000:3000"
     volumes:
@@ -64,7 +66,8 @@ services:
     depends_on:
       - backend
     environment:
-      VITE_API_BASE_URL: "http://localhost:3000/api"
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000/api}
+      VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:-http://backend:3000}
     ports:
       - "5173:5173"
     volumes:

@@ -2,6 +2,9 @@ app:
   name: "ExchangeApp"
   port: 3000
 
+auth:
+  jwt_secret: "secret"
+
 database:
   dsn: "user:password@tcp(127.0.0.1:3306)/db_name?charset=utf8mb4&parseTime=True&loc=Local"
 
@@ -9,3 +12,6 @@ redis:
   addr: "localhost:6379"
   password: ""
   db: 0
+
+storage:
+  upload_dir: "uploads"

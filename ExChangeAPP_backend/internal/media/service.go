@@ -16,7 +16,6 @@ const (
 	CoverMaxSizeBytes        int64 = 2 << 20
 	ContentImageMaxSizeBytes int64 = 5 << 20
 	ContentImageMaxCount           = 6
-	uploadRootDir                  = "uploads"
 	coverSubDir                    = "covers"
 	contentSubDir                  = "content"
 )
@@ -35,10 +34,15 @@ var allowedContentTypes = map[string]string{
 	"image/gif":  ".gif",
 }
 
-type Service struct{}
+type Service struct {
+	uploadRootDir string
+}
 
-func NewService() *Service {
-	return &Service{}
+func NewService(uploadRootDir string) *Service {
+	if uploadRootDir == "" {
+		uploadRootDir = "uploads"
+	}
+	return &Service{uploadRootDir: uploadRootDir}
 }
 
 func (s *Service) SaveCover(fileHeader *multipart.FileHeader) (string, error) {
@@ -94,7 +98,7 @@ func (s *Service) saveImage(fileHeader *multipart.FileHeader, subDir string, max
 		return "", err
 	}
 
-	dirPath := filepath.Join(uploadRootDir, subDir)
+	dirPath := filepath.Join(s.uploadRootDir, subDir)
 	if err := os.MkdirAll(dirPath, 0o755); err != nil {
 		return "", err
 	}

@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	jwtSecret        = "secret"
 	accessTokenType  = "access"
 	refreshTokenType = "refresh"
 )
+
+var jwtSecret = "secret"
 
 const (
 	accessTokenTTL  = 24 * time.Hour
@@ -77,6 +78,12 @@ func ParseAccessToken(tokenString string) (AuthClaims, error) {
 
 func ParseRefreshToken(tokenString string) (AuthClaims, error) {
 	return parseJWT(tokenString, refreshTokenType)
+}
+
+func SetJWTSecret(secret string) {
+	if secret != "" {
+		jwtSecret = secret
+	}
 }
 
 func parseJWT(tokenString, expectedTokenType string) (AuthClaims, error) {
