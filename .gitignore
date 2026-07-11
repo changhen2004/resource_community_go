@@ -8,6 +8,9 @@
 *.out
 go.work
 vendor/
+*_test.go
+*_test_test.go
+*_test_test_test.go
 
 # ========== Node.js / Frontend ==========
 node_modules/
@@ -15,6 +18,12 @@ dist/
 .env
 .env.local
 .env.*.local
+
+# Vue/TS source-generated artifacts; keep .ts/.vue only in src/
+src/**/*.js
+src/**/*.vue.js
+__VLS_types.d.ts
+
 
 # ========== IDE ==========
 .vscode/
@@ -39,8 +48,3 @@ __debug_bin
 debug
 
 /docs
-
-//测试文件
-*_test.go
-*_test_test.go
-*_test_test_test.go
