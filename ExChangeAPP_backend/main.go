@@ -3,8 +3,7 @@ package main
 import (
 	"context"
 	"exchangeapp/config"
-	"exchangeapp/global"
-	"exchangeapp/router"
+	"exchangeapp/internal/app"
 	"log"
 )
 
@@ -18,19 +17,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("init db: %v", err)
 	}
-	global.DB = db
 
 	redisClient, err := config.InitRedis(context.Background(), cfg)
 	if err != nil {
 		log.Fatalf("init redis: %v", err)
 	}
-	global.RedisDB = redisClient
 
 	if err := config.Migrate(db); err != nil {
 		log.Fatalf("migrate database: %v", err)
 	}
 
-	r := router.SetUpRouter()
+	r := app.SetUpRouter(app.Dependencies{
+		DB:      db,
+		RedisDB: redisClient,
+	})
 
 	port := cfg.App.Port
 	if port == "" {

@@ -1,15 +1,17 @@
 package config
 
 import (
-	"exchangeapp/model"
+	"exchangeapp/internal/article"
+	"exchangeapp/internal/auth"
+	"exchangeapp/internal/exchange"
 
 	"gorm.io/gorm"
 )
 
 func Migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
-		&model.User{},
-		&model.Article{},
-		&model.ExchangeRate{},
+		&auth.User{},
+		&article.Article{},
+		&exchange.ExchangeRate{},
 	)
 }

@@ -37,7 +37,7 @@ func (s *Service) Register(req RegisterRequest) (AuthResponse, error) {
 		return AuthResponse{}, err
 	}
 
-	token, err := utils.GenerateJWT(req.Username)
+	token, err := utils.GenerateJWT(user.ID, req.Username)
 	if err != nil {
 		return AuthResponse{}, err
 	}
@@ -58,7 +58,7 @@ func (s *Service) Login(req LoginRequest) (AuthResponse, error) {
 		return AuthResponse{}, ErrInvalidPassword
 	}
 
-	token, err := utils.GenerateJWT(user.Username)
+	token, err := utils.GenerateJWT(user.ID, user.Username)
 	if err != nil {
 		return AuthResponse{}, err
 	}

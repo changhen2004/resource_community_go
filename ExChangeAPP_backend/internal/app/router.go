@@ -1,7 +1,6 @@
-package router
+package app
 
 import (
-	"exchangeapp/global"
 	internalArticle "exchangeapp/internal/article"
 	internalAuth "exchangeapp/internal/auth"
 	internalExchange "exchangeapp/internal/exchange"
@@ -9,26 +8,32 @@ import (
 	"time"
 
 	"github.com/gin-contrib/cors"
-
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+	"gorm.io/gorm"
 )
 
-func SetUpRouter() *gin.Engine {
+type Dependencies struct {
+	DB      *gorm.DB
+	RedisDB *redis.Client
+}
+
+func SetUpRouter(deps Dependencies) *gin.Engine {
 	r := gin.Default()
 
 	authHandler := internalAuth.NewHandler(
 		internalAuth.NewService(
-			internalAuth.NewRepo(global.DB),
+			internalAuth.NewRepo(deps.DB),
 		),
 	)
 	articleHandler := internalArticle.NewHandler(
 		internalArticle.NewService(
-			internalArticle.NewRepo(global.DB, global.RedisDB),
+			internalArticle.NewRepo(deps.DB, deps.RedisDB),
 		),
 	)
 	exchangeHandler := internalExchange.NewHandler(
 		internalExchange.NewService(
-			internalExchange.NewRepo(global.DB),
+			internalExchange.NewRepo(deps.DB),
 		),
 	)
 

@@ -3,6 +3,7 @@ package middlewares
 import (
 	"exchangeapp/utils"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,20 +30,28 @@ func writeError(ctx *gin.Context, status int, code int, message, errorCode strin
 
 func AuthMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		token := ctx.GetHeader("Authorization")
-		if token == "" {
+		authHeader := ctx.GetHeader("Authorization")
+		if authHeader == "" {
 			writeError(ctx, http.StatusUnauthorized, 10002, "Authorization header is missing", "UNAUTHORIZED")
 			ctx.Abort()
 			return
 		}
 
-		username, err := utils.ParseJWT(token)
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") || strings.TrimSpace(parts[1]) == "" {
+			writeError(ctx, http.StatusUnauthorized, 10002, "Authorization header must use Bearer scheme", "UNAUTHORIZED")
+			ctx.Abort()
+			return
+		}
+
+		claims, err := utils.ParseJWT(strings.TrimSpace(parts[1]))
 		if err != nil {
 			writeError(ctx, http.StatusUnauthorized, 10002, err.Error(), "UNAUTHORIZED")
 			ctx.Abort()
 			return
 		}
-		ctx.Set("username", username)
+		ctx.Set("userID", claims.UserID)
+		ctx.Set("username", claims.Username)
 		ctx.Next()
 	}
 }

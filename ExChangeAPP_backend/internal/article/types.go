@@ -1,7 +1,6 @@
 package article
 
 import (
-	"exchangeapp/model"
 	"time"
 )
 
@@ -34,7 +33,7 @@ type LikeActionResponse struct {
 	Likes   int    `json:"likes"`
 }
 
-func toArticleResponse(article model.Article) ArticleResponse {
+func toArticleResponse(article Article) ArticleResponse {
 	return ArticleResponse{
 		ID:        article.ID,
 		AuthorID:  article.AuthorID,
@@ -49,7 +48,7 @@ func toArticleResponse(article model.Article) ArticleResponse {
 	}
 }
 
-func toArticleResponses(articles []model.Article) []ArticleResponse {
+func toArticleResponses(articles []Article) []ArticleResponse {
 	responses := make([]ArticleResponse, 0, len(articles))
 	for _, article := range articles {
 		responses = append(responses, toArticleResponse(article))

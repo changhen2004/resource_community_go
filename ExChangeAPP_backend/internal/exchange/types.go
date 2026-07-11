@@ -1,7 +1,6 @@
 package exchange
 
 import (
-	"exchangeapp/model"
 	"time"
 )
 
@@ -23,7 +22,7 @@ type MessageResponse struct {
 	Message string `json:"message"`
 }
 
-func toExchangeRateResponse(rate model.ExchangeRate) ExchangeRateResponse {
+func toExchangeRateResponse(rate ExchangeRate) ExchangeRateResponse {
 	return ExchangeRateResponse{
 		ID:           rate.ID,
 		FromCurrency: rate.FromCurrency,
@@ -33,7 +32,7 @@ func toExchangeRateResponse(rate model.ExchangeRate) ExchangeRateResponse {
 	}
 }
 
-func toExchangeRateResponses(rates []model.ExchangeRate) []ExchangeRateResponse {
+func toExchangeRateResponses(rates []ExchangeRate) []ExchangeRateResponse {
 	responses := make([]ExchangeRateResponse, 0, len(rates))
 	for _, rate := range rates {
 		responses = append(responses, toExchangeRateResponse(rate))
