@@ -118,6 +118,30 @@
                 <span>当前余额</span>
                 <strong>{{ authStore.pointsBalance }}</strong>
               </div>
+              <div class="redeem-box">
+                <div>
+                  <span class="privilege-label">权益兑换</span>
+                  <p class="redeem-copy">使用积分兑换额外展示权益，兑换后会显示在下方列表中。</p>
+                </div>
+                <div class="redeem-actions">
+                  <el-select v-model="selectedPrivilegeKey" class="redeem-select" placeholder="选择权益">
+                    <el-option
+                      v-for="option in privilegeOptions"
+                      :key="option.value"
+                      :label="option.label"
+                      :value="option.value"
+                    />
+                  </el-select>
+                  <el-button
+                    type="primary"
+                    :loading="redeemLoading"
+                    :disabled="!selectedPrivilegeKey"
+                    @click="handleRedeemPrivilege"
+                  >
+                    立即兑换
+                  </el-button>
+                </div>
+              </div>
               <div class="privilege-list">
                 <span class="privilege-label">已兑换权益</span>
                 <el-tag
@@ -175,7 +199,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { listMyFavorites, type FavoriteArticle } from '../api/favorite';
 import { checkIn } from '../api/checkin';
-import { getMyPointsRecords, type PointsRecord } from '../api/points';
+import { getMyPointsRecords, redeemPrivilege, type PointsRecord } from '../api/points';
 import { useAuthStore } from '../store/auth';
 
 const router = useRouter();
@@ -189,10 +213,16 @@ const checkInLoading = ref(false);
 const favoriteError = ref('');
 const recordError = ref('');
 const checkInDate = ref<string | null>(localStorage.getItem('daily_check_in_date'));
+const redeemLoading = ref(false);
+const selectedPrivilegeKey = ref('');
 
 const today = new Date().toISOString().slice(0, 10);
 
 const checkInCompleted = computed(() => checkInDate.value === today);
+const privilegeOptions = [
+  { label: '精选推荐位 - 30 积分', value: 'feature_article' },
+  { label: '优先发布 - 50 积分', value: 'priority_publish' },
+];
 
 const loadFavorites = async () => {
   if (!authStore.isAuthenticated) {
@@ -249,6 +279,25 @@ const handleCheckIn = async () => {
     ElMessage.error('签到失败，请稍后再试。');
   } finally {
     checkInLoading.value = false;
+  }
+};
+
+const handleRedeemPrivilege = async () => {
+  if (!authStore.isAuthenticated || !selectedPrivilegeKey.value) {
+    return;
+  }
+
+  redeemLoading.value = true;
+  try {
+    const response = await redeemPrivilege({ privilegeKey: selectedPrivilegeKey.value });
+    await Promise.all([authStore.refreshSummary(), loadPointRecords()]);
+    selectedPrivilegeKey.value = '';
+    ElMessage.success(response.message || '权益兑换成功');
+  } catch (error) {
+    console.error('Failed to redeem privilege:', error);
+    ElMessage.error('权益兑换失败，请检查积分余额或是否已兑换。');
+  } finally {
+    redeemLoading.value = false;
   }
 };
 
@@ -486,6 +535,32 @@ onMounted(async () => {
   padding: 18px;
   border-radius: 22px;
   background: rgba(247, 240, 232, 0.92);
+}
+
+.redeem-box {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(92, 53, 34, 0.08);
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.redeem-copy {
+  margin: 8px 0 0;
+  color: #6f584b;
+  line-height: 1.6;
+}
+
+.redeem-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.redeem-select {
+  min-width: 220px;
 }
 
 .points-balance span,

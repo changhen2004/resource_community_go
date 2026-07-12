@@ -11,6 +11,9 @@
         <el-button type="primary" size="large" @click="router.push({ name: 'Resources' })">
           进入资源广场
         </el-button>
+        <el-button size="large" type="success" @click="router.push({ name: 'CreateResource' })">
+          立即发布
+        </el-button>
         <el-button size="large" plain @click="router.push({ name: 'Center' })">
           查看用户中心
         </el-button>

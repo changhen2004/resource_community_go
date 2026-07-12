@@ -227,6 +227,15 @@
             >
               点赞资源
             </el-button>
+            <el-button
+              class="action-button"
+              :type="isFavorited ? 'danger' : 'success'"
+              plain
+              :loading="favoriteSubmitting"
+              @click="handleFavoriteToggle"
+            >
+              {{ isFavorited ? '取消收藏' : '收藏资源' }}
+            </el-button>
           </section>
         </aside>
       </section>
@@ -244,6 +253,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { getArticleDetail, getArticleLikes, likeArticle } from '../api/article';
 import { createComment, deleteComment, listComments, type Comment } from '../api/comment';
+import { favoriteArticle, listMyFavorites, unfavoriteArticle } from '../api/favorite';
 import { unlockArticle } from '../api/points';
 import { useAuthStore } from '../store/auth';
 import type { ResourceDetail } from '../types/resource';
@@ -263,6 +273,8 @@ const commentLoading = ref(false);
 const commentSubmitting = ref(false);
 const deletingCommentId = ref<number | null>(null);
 const commentErrorMessage = ref('');
+const favoriteSubmitting = ref(false);
+const isFavorited = ref(false);
 
 const resourceID = String(route.params.id);
 
@@ -336,12 +348,27 @@ const fetchComments = async () => {
   }
 };
 
+const syncFavoriteState = async () => {
+  if (!authStore.isAuthenticated || !resource.value) {
+    isFavorited.value = false;
+    return;
+  }
+
+  try {
+    const favorites = await listMyFavorites();
+    isFavorited.value = favorites.some((favorite) => favorite.id === resource.value?.id);
+  } catch (error) {
+    console.error('Failed to sync favorite state:', error);
+  }
+};
+
 const fetchPageData = async () => {
   loading.value = true;
   errorMessage.value = '';
 
   try {
     await Promise.all([fetchResource(), fetchLikes(), fetchComments()]);
+    await syncFavoriteState();
   } catch (error) {
     console.error('Failed to load resource detail:', error);
     errorMessage.value = '详情内容加载失败，请稍后重试。';
@@ -404,6 +431,33 @@ const handleLikeResource = async () => {
   } catch (error) {
     console.error('Error liking resource:', error);
     ElMessage.error('点赞失败，请稍后再试。');
+  }
+};
+
+const handleFavoriteToggle = async () => {
+  if (!authStore.isAuthenticated) {
+    ElMessage.error('请先登录后再收藏');
+    return;
+  }
+
+  favoriteSubmitting.value = true;
+  try {
+    if (isFavorited.value) {
+      await unfavoriteArticle(resourceID);
+      isFavorited.value = false;
+      ElMessage.success('已取消收藏');
+    } else {
+      await favoriteArticle(resourceID);
+      isFavorited.value = true;
+      ElMessage.success('收藏成功');
+    }
+
+    await fetchResource();
+  } catch (error) {
+    console.error('Failed to update favorite state:', error);
+    ElMessage.error('收藏操作失败，请稍后再试。');
+  } finally {
+    favoriteSubmitting.value = false;
   }
 };
 

@@ -10,6 +10,7 @@
       >
         <el-menu-item index="home">首页</el-menu-item>
         <el-menu-item index="resources">资源广场</el-menu-item>
+        <el-menu-item v-if="authStore.isAuthenticated" index="create">发布资源</el-menu-item>
         <el-menu-item v-if="authStore.isAuthenticated" index="center">用户中心</el-menu-item>
         <el-menu-item v-if="!authStore.isAuthenticated" index="login">登录</el-menu-item>
         <el-menu-item v-if="!authStore.isAuthenticated" index="register">注册</el-menu-item>
@@ -33,6 +34,7 @@ import { useAuthStore } from './store/auth';
 const routeNameMap: Record<string, string> = {
   home: 'Home',
   resources: 'Resources',
+  create: 'CreateResource',
   center: 'Center',
   login: 'Login',
   register: 'Register',
