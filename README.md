@@ -204,12 +204,6 @@ Grafana 默认加载 `Resource Community API` 仪表盘。更多说明见 [docs/
 | POST | `/uploads/cover` | JWT | 上传封面图 |
 | POST | `/uploads/content-images` | JWT | 上传正文配图 |
 
-### 汇率 `/api/exchangeRates`
-
-| 方法 | 路径 | 鉴权 | 说明 |
-|------|------|------|------|
-| GET | `/exchangeRates` | 否 | 汇率查询 |
-| POST | `/exchangeRates` | JWT | 发布汇率 |
 
 ## 本地运行
 
