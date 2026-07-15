@@ -234,9 +234,9 @@ docker compose up -d
 访问地址：
 
 - Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:3000/api`
-- Health Check: `http://localhost:3000/healthz`
-- Metrics: `http://localhost:3000/metrics`
+- Backend API: `http://localhost:8080/api`
+- Health Check: `http://localhost:8080/healthz`
+- Metrics: `http://localhost:8080/metrics`
 - Prometheus: `http://localhost:9091`
 - Grafana: `http://localhost:3001`，默认账号 `admin/admin`
 - RabbitMQ 管理台: `http://localhost:15674`
@@ -319,7 +319,7 @@ docs/evidence/observability-drill-<timestamp>.md
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `RESOURCE_COMMUNITY_GO_APP_PORT` | `3000` | 后端监听端口 |
+| `RESOURCE_COMMUNITY_GO_APP_PORT` | `8080` | 后端监听端口 |
 | `RESOURCE_COMMUNITY_GO_ENABLE_PPROF` | `false` | 是否开启 pprof |
 | `RESOURCE_COMMUNITY_GO_SLOW_REQUEST_THRESHOLD_MS` | `500` | 慢请求阈值，单位毫秒 |
 | `RESOURCE_COMMUNITY_GO_DATABASE_DSN` | `resource_community_go:resource_community_go@tcp(mysql:3306)/resource_community_go?charset=utf8mb4&parseTime=True&loc=Local` | MySQL 连接串 |

@@ -73,7 +73,7 @@ services:
       RESOURCE_COMMUNITY_GO_JWT_SECRET: ${RESOURCE_COMMUNITY_GO_JWT_SECRET:-secret}
       RESOURCE_COMMUNITY_GO_UPLOAD_DIR: ${RESOURCE_COMMUNITY_GO_UPLOAD_DIR:-uploads}
     ports:
-      - "3000:3000"
+      - "8081:8080"
     volumes:
       - ./backend:/app
       - backend_uploads:/app/uploads

@@ -1,6 +1,6 @@
 app:
   name: "resource_community_go"
-  port: 3000
+  port: 8080
 
 observability:
   enable_pprof: false
