@@ -54,7 +54,7 @@ func (r *Repo) List(query ListArticlesQuery) ([]Article, error) {
 	default:
 		db = db.Order("created_at DESC")
 	}
-
+	//分页查询文章列表：计算 SQL 分页里的“跳过多少条”
 	offset := (query.Page - 1) * query.PageSize
 	if err := db.Offset(offset).Limit(query.PageSize).Find(&articles).Error; err != nil {
 		return nil, err
