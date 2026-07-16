@@ -8,6 +8,7 @@ import { useAuthStore } from './store/auth';
 const push = vi.fn();
 const currentRoute = reactive({
   name: 'Home',
+  query: {},
 });
 
 vi.mock('vue-router', () => ({

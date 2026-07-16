@@ -1,16 +1,54 @@
 // https://vitejs.dev/config/
 import { defineConfig, loadEnv } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import AutoImport from 'unplugin-auto-import/vite';
+import Components from 'unplugin-vue-components/vite';
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const proxyTarget = env.VITE_PROXY_TARGET || 'http://localhost:3000';
 
   return {
-    plugins: [vue()],
+    plugins: [
+      vue(),
+      AutoImport({
+        dts: 'src/auto-imports.d.ts',
+        imports: ['vue', 'vue-router'],
+        resolvers: [ElementPlusResolver()],
+      }),
+      Components({
+        dts: 'src/components.d.ts',
+        resolvers: [ElementPlusResolver({ importStyle: 'css' })],
+      }),
+    ],
     test: {
       environment: 'jsdom',
       globals: true,
+      server: {
+        deps: {
+          inline: ['element-plus'],
+        },
+      },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('element-plus')) {
+                return 'element-plus';
+              }
+              if (id.includes('vue-router') || id.includes('pinia') || id.includes('/vue/')) {
+                return 'vue-vendor';
+              }
+              if (id.includes('axios')) {
+                return 'http';
+              }
+            }
+          },
+        },
+      },
     },
     server: {
       proxy: {
