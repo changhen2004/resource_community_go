@@ -73,7 +73,12 @@ services:
       RESOURCE_COMMUNITY_GO_JWT_SECRET: ${RESOURCE_COMMUNITY_GO_JWT_SECRET:-secret}
       RESOURCE_COMMUNITY_GO_UPLOAD_DIR: ${RESOURCE_COMMUNITY_GO_UPLOAD_DIR:-uploads}
     ports:
-      - "8081:8080"
+      - "8080:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     volumes:
       - ./backend:/app
       - backend_uploads:/app/uploads
@@ -114,9 +119,10 @@ services:
     container_name: resource-community-go-frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000/api}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
       VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:-http://backend:3000}
     ports:
       - "5173:5173"
