@@ -37,9 +37,7 @@
               <span>{{ resource.title.slice(0, 1) }}</span>
             </div>
             <div class="hero-cover__shade"></div>
-          </div>
 
-          <div class="hero-body">
             <div class="hero-topbar">
               <button type="button" class="ghost-link" @click="goBackToList">
                 返回资源广场
@@ -50,35 +48,37 @@
               </div>
             </div>
 
-            <p class="hero-kicker">RESOURCE STORY</p>
-            <h1>{{ resource.title }}</h1>
-            <p class="hero-preview">{{ resource.preview }}</p>
+            <div class="hero-body">
+              <p class="hero-kicker">RESOURCE STORY</p>
+              <h1>{{ resource.title }}</h1>
+              <p class="hero-preview">{{ resource.preview }}</p>
 
-            <div v-if="resource.tags?.length" class="hero-tags">
-              <button
-                v-for="tag in resource.tags"
-                :key="tag"
-                type="button"
-                class="hero-tag"
-                @click="goToTag(tag)"
-              >
-                {{ tag }}
-              </button>
-            </div>
+              <div v-if="resource.tags?.length" class="hero-tags">
+                <button
+                  v-for="tag in resource.tags"
+                  :key="tag"
+                  type="button"
+                  class="hero-tag"
+                  @click="goToTag(tag)"
+                >
+                  {{ tag }}
+                </button>
+              </div>
 
-            <div class="hero-meta-grid">
-              <article class="hero-meta-card">
-                <span>作者</span>
-                <strong>{{ resource.author?.username || '匿名作者' }}</strong>
-              </article>
-              <article class="hero-meta-card">
-                <span>可见性</span>
-                <strong>{{ resource.isFree ? '公开阅读' : '积分门槛' }}</strong>
-              </article>
-              <article class="hero-meta-card">
-                <span>互动热度</span>
-                <strong>{{ likes }}</strong>
-              </article>
+              <div class="hero-meta-grid">
+                <article class="hero-meta-card">
+                  <span>作者</span>
+                  <strong>{{ resource.author?.username || '匿名作者' }}</strong>
+                </article>
+                <article class="hero-meta-card">
+                  <span>可见性</span>
+                  <strong>{{ resource.isFree ? '公开阅读' : '积分门槛' }}</strong>
+                </article>
+                <article class="hero-meta-card">
+                  <span>互动热度</span>
+                  <strong>{{ likes }}</strong>
+                </article>
+              </div>
             </div>
           </div>
         </section>
@@ -737,32 +737,27 @@ onMounted(fetchPageData);
   margin-top: 20px;
 }
 
-.hero-panel {
-  overflow: hidden;
-}
-
 .hero-cover-wrap {
   position: relative;
-  aspect-ratio: 16 / 8.4;
+  min-height: 360px;
+  border-radius: 26px;
+  overflow: hidden;
   background:
     linear-gradient(140deg, rgba(19, 63, 69, 0.92), rgba(124, 99, 55, 0.86)),
     #244;
 }
 
-.hero-cover,
-.hero-cover--placeholder {
-  width: 100%;
-  height: 100%;
-}
-
 .hero-cover {
   display: block;
-  object-fit: cover;
+  width: 100%;
+  height: auto;
 }
 
 .hero-cover--placeholder {
   display: grid;
   place-items: center;
+  aspect-ratio: 16 / 9.5;
+  width: 100%;
   color: rgba(247, 243, 233, 0.95);
   font-size: clamp(64px, 10vw, 110px);
   font-weight: 700;
@@ -774,13 +769,6 @@ onMounted(fetchPageData);
   background: linear-gradient(180deg, rgba(16, 21, 24, 0.12), rgba(16, 21, 24, 0.7));
 }
 
-.hero-body {
-  position: relative;
-  margin-top: -110px;
-  padding: 0 28px 28px;
-  color: #f7f4eb;
-}
-
 .hero-topbar,
 .section-head {
   display: flex;
@@ -790,7 +778,22 @@ onMounted(fetchPageData);
 }
 
 .hero-topbar {
-  margin-bottom: 18px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  padding: 28px;
+}
+
+.hero-body {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  padding: 0 28px 28px;
+  color: #f7f4eb;
 }
 
 .ghost-link,
@@ -1152,9 +1155,16 @@ onMounted(fetchPageData);
     padding: 18px 12px 40px;
   }
 
+  .hero-cover-wrap {
+    min-height: 420px;
+  }
+
   .hero-body {
-    margin-top: -70px;
     padding: 0 18px 18px;
+  }
+
+  .hero-topbar {
+    padding: 18px;
   }
 
   .hero-meta-grid,
