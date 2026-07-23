@@ -10,8 +10,8 @@ docker compose up --build
 
 访问地址：
 
-- Backend: http://localhost:3000
-- Metrics: http://localhost:3000/metrics
+- Backend: http://localhost:8080
+- Metrics: http://localhost:8080/metrics
 - Prometheus: http://localhost:9091
 - Grafana: http://localhost:3001
 
@@ -84,15 +84,15 @@ histogram_quantile(
 
 ```bash
 for i in $(seq 1 100); do
-  curl -s http://localhost:3000/healthz >/dev/null
+  curl -s http://localhost:8080/healthz >/dev/null
 done
 ```
 
 也可以访问资源相关接口观察路由维度指标：
 
 ```bash
-curl -s "http://localhost:3000/api/articles?page=1&pageSize=10" >/dev/null
-curl -s "http://localhost:3000/api/articles/hot?limit=10" >/dev/null
+curl -s "http://localhost:8080/api/articles?page=1&pageSize=10" >/dev/null
+curl -s "http://localhost:8080/api/articles/hot?limit=10" >/dev/null
 ```
 
 ## 压测与演练报告
@@ -120,6 +120,7 @@ scripts/observability_drill.sh --duration 90 --concurrency 12 --include-error-tr
 报告内容包括：
 
 - 本地请求数和错误率
+- 接口维度请求数、非 2xx/失败数、错误率、平均耗时和 P95
 - Prometheus 查询到的 QPS、P50、P95、非 2xx 错误率、5xx 错误率
 - Grafana 截图建议
 - 可关联到 OnCallAgent 知识库的排障案例记录

@@ -318,6 +318,7 @@ docs/evidence/observability-drill-<timestamp>.md
 报告包含：
 
 - 本地请求数和错误率
+- 接口维度请求数、非 2xx/失败数、错误率、平均耗时和 P95
 - Prometheus 查询到的 QPS、P50、P95、非 2xx 错误率、5xx 错误率
 - Grafana 截图建议
 - 可关联到 OnCallAgent 的排障案例记录

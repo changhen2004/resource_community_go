@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:3000}"
+BASE_URL="${BASE_URL:-http://localhost:8080}"
 PROMETHEUS_URL="${PROMETHEUS_URL:-http://localhost:9091}"
 DURATION_SECONDS="${DURATION_SECONDS:-60}"
 CONCURRENCY="${CONCURRENCY:-8}"
@@ -15,7 +15,7 @@ Usage:
   scripts/observability_drill.sh [options]
 
 Options:
-  --base-url URL              Backend base URL. Default: http://localhost:3000
+  --base-url URL              Backend base URL. Default: http://localhost:8080
   --prometheus-url URL        Prometheus URL. Default: http://localhost:9091
   --duration SECONDS          Traffic duration. Default: 60
   --concurrency N             Concurrent workers. Default: 8
@@ -77,6 +77,9 @@ require_command() {
 require_command curl
 require_command date
 require_command mktemp
+require_command sort
+
+BT='`'
 
 if ! [[ "$DURATION_SECONDS" =~ ^[0-9]+$ ]] || [[ "$DURATION_SECONDS" -lt 10 ]]; then
   echo "--duration must be an integer >= 10" >&2
@@ -119,7 +122,63 @@ format_number() {
 
 hit_endpoint() {
   local path="$1"
-  curl -sS -o /dev/null -w "%{http_code} %{time_total}\n" "${BASE_URL}${path}" || printf "000 0\n"
+  local result
+  if result="$(curl -sS -o /dev/null -w "%{http_code} %{time_total}" "${BASE_URL}${path}")"; then
+    printf "%s %s\n" "$path" "$result"
+  else
+    printf "%s 000 0\n" "$path"
+  fi
+}
+
+endpoint_summary_table() {
+  local log_file="$1"
+  local code_tick="$BT"
+  if [[ ! -s "$log_file" ]]; then
+    printf "| 接口 | 请求数 | 非 2xx/失败数 | 错误率 | 平均耗时 | P95 |\n"
+    printf "|------|--------|----------------|--------|----------|-----|\n"
+    return
+  fi
+
+  printf "| 接口 | 请求数 | 非 2xx/失败数 | 错误率 | 平均耗时 | P95 |\n"
+  printf "|------|--------|----------------|--------|----------|-----|\n"
+  awk '{ print $1 }' "$log_file" | sort -u | while read -r path; do
+    local count
+    local errors
+    local error_rate
+    local avg_latency
+    local p95_latency
+
+    count="$(awk -v path="$path" '$1 == path { count++ } END { print count + 0 }' "$log_file")"
+    errors="$(awk -v path="$path" '$1 == path && $2 !~ /^2/ { count++ } END { print count + 0 }' "$log_file")"
+    error_rate="$(awk -v total="$count" -v errors="$errors" 'BEGIN { if (total == 0) printf "0.00"; else printf "%.2f", errors / total * 100 }')"
+    avg_latency="$(awk -v path="$path" '$1 == path { sum += $3; count++ } END { if (count == 0) printf "0.0000"; else printf "%.4f", sum / count }' "$log_file")"
+    p95_latency="$(
+      awk -v path="$path" '$1 == path { print $3 }' "$log_file" |
+        sort -n |
+        awk '{
+          values[NR] = $1
+        }
+        END {
+          if (NR == 0) {
+            printf "0.0000"
+            exit
+          }
+          percentile_index = int(NR * 0.95)
+          if (percentile_index < 1) {
+            percentile_index = 1
+          }
+          if (percentile_index < NR * 0.95) {
+            percentile_index++
+          }
+          if (percentile_index > NR) {
+            percentile_index = NR
+          }
+          printf "%.4f", values[percentile_index]
+        }'
+    )"
+
+    printf "| %s%s%s | %s | %s | %s%% | %ss | %ss |\n" "$code_tick" "$path" "$code_tick" "$count" "$errors" "$error_rate" "$avg_latency" "$p95_latency"
+  done
 }
 
 worker() {
@@ -174,8 +233,9 @@ echo "waiting for prometheus scrape..."
 sleep 8
 
 total_requests="$(wc -l <"$traffic_log" | tr -d ' ')"
-local_error_count="$(awk '$1 !~ /^2/ { count++ } END { print count + 0 }' "$traffic_log")"
+local_error_count="$(awk '$2 !~ /^2/ { count++ } END { print count + 0 }' "$traffic_log")"
 local_error_rate="$(awk -v total="$total_requests" -v errors="$local_error_count" 'BEGIN { if (total == 0) print 0; else print errors / total * 100 }')"
+endpoint_summary="$(endpoint_summary_table "$traffic_log")"
 
 qps="$(prom_scalar 'sum(rate(resource_community_http_requests_total[1m]))')"
 p50="$(prom_scalar 'histogram_quantile(0.50, sum(rate(resource_community_http_request_duration_seconds_bucket[1m])) by (le))')"
@@ -202,6 +262,10 @@ cat >"$REPORT_FILE" <<EOF_REPORT
 - 非 2xx/请求失败数：${local_error_count}
 - 本地错误率：$(format_number "$local_error_rate" 2)%
 
+## 接口维度本地统计
+
+${endpoint_summary}
+
 ## Prometheus 指标快照
 
 - QPS：$(format_number "$qps" 2)
@@ -212,7 +276,7 @@ cat >"$REPORT_FILE" <<EOF_REPORT
 
 ## 截图建议
 
-在 Grafana 打开 `Resource Community / Resource Community API`，时间范围选择 `Last 15 minutes`，截取以下面板：
+在 Grafana 打开 ${BT}Resource Community / Resource Community API${BT}，时间范围选择 ${BT}Last 15 minutes${BT}，截取以下面板：
 
 - QPS
 - Non-2xx Error Rate
@@ -225,7 +289,7 @@ cat >"$REPORT_FILE" <<EOF_REPORT
 
 现象：
 
-- 本次演练通过固定并发访问 `/healthz`、`/api/articles`、`/api/articles/hot`、`/api/articles/1` 产生基础流量。
+- 本次演练通过固定并发访问 ${BT}/healthz${BT}、${BT}/api/articles${BT}、${BT}/api/articles/hot${BT}、${BT}/api/articles/1${BT} 产生基础流量。
 - 如果开启错误流量，会额外访问不存在路由，用于验证非 2xx 错误率面板。
 
 判断：
@@ -237,10 +301,10 @@ cat >"$REPORT_FILE" <<EOF_REPORT
 
 处理动作：
 
-- 若 P95 升高，按 OnCallAgent 知识库文档 `resource-community-p95-latency.md` 排查慢路由、Redis、MySQL、RabbitMQ 和后端日志。
-- 若 5xx 升高，按 `resource-community-error-rate.md` 定位错误路由和依赖异常。
-- 若热榜不更新，按 `resource-community-hot-ranking.md` 检查 Redis ZSet、缓存失效和 Worker 消费。
-- 若异步更新延迟，按 `resource-community-rabbitmq-backlog.md` 检查 RabbitMQ 队列和 Worker 日志。
+- 若 P95 升高，按 OnCallAgent 知识库文档 ${BT}resource-community-p95-latency.md${BT} 排查慢路由、Redis、MySQL、RabbitMQ 和后端日志。
+- 若 5xx 升高，按 ${BT}resource-community-error-rate.md${BT} 定位错误路由和依赖异常。
+- 若热榜不更新，按 ${BT}resource-community-hot-ranking.md${BT} 检查 Redis ZSet、缓存失效和 Worker 消费。
+- 若异步更新延迟，按 ${BT}resource-community-rabbitmq-backlog.md${BT} 检查 RabbitMQ 队列和 Worker 日志。
 
 ## 可写入简历的数据表述模板
 
