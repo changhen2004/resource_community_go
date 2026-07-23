@@ -123,7 +123,7 @@ format_number() {
 hit_endpoint() {
   local path="$1"
   local result
-  if result="$(curl -sS -o /dev/null -w "%{http_code} %{time_total}" "${BASE_URL}${path}")"; then
+  if result="$(curl -s -o /dev/null -w "%{http_code} %{time_total}" --connect-timeout 2 --max-time 5 "${BASE_URL}${path}")"; then
     printf "%s %s\n" "$path" "$result"
   else
     printf "%s 000 0\n" "$path"
@@ -134,26 +134,28 @@ endpoint_summary_table() {
   local log_file="$1"
   local code_tick="$BT"
   if [[ ! -s "$log_file" ]]; then
-    printf "| 接口 | 请求数 | 非 2xx/失败数 | 错误率 | 平均耗时 | P95 |\n"
-    printf "|------|--------|----------------|--------|----------|-----|\n"
+    printf "| 接口 | 请求数 | HTTP 非 2xx 数 | 客户端失败数 | 异常率 | 平均耗时 | P95 |\n"
+    printf "|------|--------|----------------|----------------|--------|----------|-----|\n"
     return
   fi
 
-  printf "| 接口 | 请求数 | 非 2xx/失败数 | 错误率 | 平均耗时 | P95 |\n"
-  printf "|------|--------|----------------|--------|----------|-----|\n"
+  printf "| 接口 | 请求数 | HTTP 非 2xx 数 | 客户端失败数 | 异常率 | 平均耗时 | P95 |\n"
+  printf "|------|--------|----------------|----------------|--------|----------|-----|\n"
   awk '{ print $1 }' "$log_file" | sort -u | while read -r path; do
     local count
-    local errors
-    local error_rate
+    local http_errors
+    local client_failures
+    local abnormal_rate
     local avg_latency
     local p95_latency
 
     count="$(awk -v path="$path" '$1 == path { count++ } END { print count + 0 }' "$log_file")"
-    errors="$(awk -v path="$path" '$1 == path && $2 !~ /^2/ { count++ } END { print count + 0 }' "$log_file")"
-    error_rate="$(awk -v total="$count" -v errors="$errors" 'BEGIN { if (total == 0) printf "0.00"; else printf "%.2f", errors / total * 100 }')"
-    avg_latency="$(awk -v path="$path" '$1 == path { sum += $3; count++ } END { if (count == 0) printf "0.0000"; else printf "%.4f", sum / count }' "$log_file")"
+    http_errors="$(awk -v path="$path" '$1 == path && $2 != "000" && $2 !~ /^2/ { count++ } END { print count + 0 }' "$log_file")"
+    client_failures="$(awk -v path="$path" '$1 == path && $2 == "000" { count++ } END { print count + 0 }' "$log_file")"
+    abnormal_rate="$(awk -v total="$count" -v http_errors="$http_errors" -v client_failures="$client_failures" 'BEGIN { if (total == 0) printf "0.00"; else printf "%.2f", (http_errors + client_failures) / total * 100 }')"
+    avg_latency="$(awk -v path="$path" '$1 == path && $2 != "000" { sum += $3; count++ } END { if (count == 0) printf "0.0000"; else printf "%.4f", sum / count }' "$log_file")"
     p95_latency="$(
-      awk -v path="$path" '$1 == path { print $3 }' "$log_file" |
+      awk -v path="$path" '$1 == path && $2 != "000" { print $3 }' "$log_file" |
         sort -n |
         awk '{
           values[NR] = $1
@@ -177,7 +179,7 @@ endpoint_summary_table() {
         }'
     )"
 
-    printf "| %s%s%s | %s | %s | %s%% | %ss | %ss |\n" "$code_tick" "$path" "$code_tick" "$count" "$errors" "$error_rate" "$avg_latency" "$p95_latency"
+    printf "| %s%s%s | %s | %s | %s | %s%% | %ss | %ss |\n" "$code_tick" "$path" "$code_tick" "$count" "$http_errors" "$client_failures" "$abnormal_rate" "$avg_latency" "$p95_latency"
   done
 }
 
@@ -233,8 +235,9 @@ echo "waiting for prometheus scrape..."
 sleep 8
 
 total_requests="$(wc -l <"$traffic_log" | tr -d ' ')"
-local_error_count="$(awk '$2 !~ /^2/ { count++ } END { print count + 0 }' "$traffic_log")"
-local_error_rate="$(awk -v total="$total_requests" -v errors="$local_error_count" 'BEGIN { if (total == 0) print 0; else print errors / total * 100 }')"
+http_non_2xx_count="$(awk '$2 != "000" && $2 !~ /^2/ { count++ } END { print count + 0 }' "$traffic_log")"
+client_failure_count="$(awk '$2 == "000" { count++ } END { print count + 0 }' "$traffic_log")"
+local_abnormal_rate="$(awk -v total="$total_requests" -v http_errors="$http_non_2xx_count" -v client_failures="$client_failure_count" 'BEGIN { if (total == 0) print 0; else print (http_errors + client_failures) / total * 100 }')"
 endpoint_summary="$(endpoint_summary_table "$traffic_log")"
 
 qps="$(prom_scalar 'sum(rate(resource_community_http_requests_total[1m]))')"
@@ -259,8 +262,9 @@ cat >"$REPORT_FILE" <<EOF_REPORT
 ## 本地请求统计
 
 - 总请求数：${total_requests}
-- 非 2xx/请求失败数：${local_error_count}
-- 本地错误率：$(format_number "$local_error_rate" 2)%
+- HTTP 非 2xx 数：${http_non_2xx_count}
+- 客户端请求失败数：${client_failure_count}
+- 本地异常率：$(format_number "$local_abnormal_rate" 2)%
 
 ## 接口维度本地统计
 
@@ -273,6 +277,12 @@ ${endpoint_summary}
 - P95：$(format_number "$p95" 4)s
 - 非 2xx 错误率：$(format_number "$non_2xx_error_rate" 2)%
 - 5xx 错误率：$(format_number "$five_xx_error_rate" 2)%
+
+## 结论与统计口径
+
+- 服务端口径以 Prometheus 指标为准，只统计已进入后端 HTTP 中间件并完成指标采集的请求。
+- 本地客户端请求失败表示压测端未拿到 HTTP 响应，不计入 HTTP 非 2xx；如果该值偏高，优先判断本机短连接 `curl` 循环或网络栈成为瓶颈。
+- 简历和复盘材料建议同时标注压测环境、持续时间、并发数、服务端错误率和是否存在客户端失败。
 
 ## 截图建议
 
