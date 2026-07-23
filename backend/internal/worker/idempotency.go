@@ -15,6 +15,7 @@ const (
 type IdempotencyStore interface {
 	Begin(ctx context.Context, jobID string) (bool, error)
 	Complete(ctx context.Context, jobID string) error
+	Release(ctx context.Context, jobID string) error
 }
 
 type NoopIdempotencyStore struct{}
@@ -24,6 +25,10 @@ func (NoopIdempotencyStore) Begin(context.Context, string) (bool, error) {
 }
 
 func (NoopIdempotencyStore) Complete(context.Context, string) error {
+	return nil
+}
+
+func (NoopIdempotencyStore) Release(context.Context, string) error {
 	return nil
 }
 
@@ -57,4 +62,12 @@ func (s *RedisIdempotencyStore) Complete(ctx context.Context, jobID string) erro
 	}
 
 	return s.client.Set(ctx, s.prefix+jobID, "done", idempotencyDoneTTL).Err()
+}
+
+func (s *RedisIdempotencyStore) Release(ctx context.Context, jobID string) error {
+	if s == nil || s.client == nil || jobID == "" {
+		return nil
+	}
+
+	return s.client.Del(ctx, s.prefix+jobID).Err()
 }
