@@ -334,6 +334,8 @@ Grafana
 
 系统在持续压力访问下保持稳定响应。
 
+真实压测示例见 [docs/benchmark.md](docs/benchmark.md)。
+
 ## OnCallAgent 联动
 
 项目提供真实业务监控数据：

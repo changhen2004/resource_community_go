@@ -48,4 +48,6 @@ uploads/
 __debug_bin
 debug
 
-/docs
+/docs/*
+!docs/benchmark.md
+
